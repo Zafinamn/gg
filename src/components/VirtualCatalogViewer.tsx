@@ -965,32 +965,48 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   };
 
   // Spread calculation for labels
+  // Clipboard helper. For an already-open shared page, the click handler is a
+  // direct user gesture, so prefer the synchronous execCommand path first.
+  // Some Chromium/Vercel deployments can resolve navigator.clipboard.writeText()
+  // without actually updating the clipboard when permissions are restricted.
   const copyTextToClipboard = async (text: string) => {
+    const legacyCopy = () => {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.top = "0";
+        textarea.style.left = "-10000px";
+        textarea.style.width = "1px";
+        textarea.style.height = "1px";
+        textarea.style.opacity = "1";
+        textarea.style.pointerEvents = "none";
+        document.body.appendChild(textarea);
+        textarea.focus({ preventScroll: true });
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        return copied;
+      } catch {
+        return false;
+      }
+    };
+
+    // This is the most reliable one-click path for the shared-view button.
+    if (legacyCopy()) return true;
+
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(text);
         return true;
       } catch {
-        // Fall through to the legacy browser fallback below.
+        return false;
       }
     }
 
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      textarea.style.pointerEvents = "none";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return copied;
-    } catch {
-      return false;
-    }
+    return false;
   };
 
   const showShareCopied = () => {
@@ -1910,58 +1926,12 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                     </motion.div>
                   </motion.div>
 
-                  {/* 3D Animated Turning Leaf during button/keyboard flips */}
-                  <AnimatePresence>
-                    {isFlipping && (
-                      <motion.div
-                        key={`flipping-leaf-${flipDirection}`}
-                        initial={{
-                          rotateY: flipDirection === "next" ? 0 : 180,
-                          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.45)",
-                        }}
-                        animate={{
-                          rotateY: flipDirection === "next" ? -180 : 0,
-                          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.2)",
-                        }}
-                        transition={{
-                          duration: 0.52,
-                          ease: [0.16, 1, 0.3, 1],
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          bottom: 0,
-                          left: flipDirection === "next" ? "50%" : 0,
-                          width: "50%",
-                          transformOrigin: flipDirection === "next" ? "left center" : "right center",
-                          transformStyle: "preserve-3d",
-                          perspective: 1600,
-                          zIndex: 35,
-                        }}
-                        className={`bg-white overflow-hidden pointer-events-none border-t border-b ${
-                          flipDirection === "next"
-                            ? "rounded-r-2xl border-r border-slate-200"
-                            : "rounded-l-2xl border-l border-slate-200"
-                        }`}
-                      >
-                        {/* Front Face with sheen */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-slate-100 via-white to-slate-200">
-                          <div className="absolute inset-0 bg-gradient-to-r from-black/25 via-transparent to-black/10 pointer-events-none" />
-                        </div>
-                        {/* Underside Face with shadow */}
-                        <div
-                          style={{
-                            transform: "rotateY(180deg)",
-                            backfaceVisibility: "hidden",
-                          }}
-                          className="absolute inset-0 bg-gradient-to-l from-slate-100 via-white to-slate-200 border-l border-slate-300"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-l from-black/30 via-transparent to-transparent pointer-events-none" />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
+                  {/*
+                    The physical page sheets above already perform the real 3D flip.
+                    Do not render a second synthetic gray turning-leaf overlay: it can
+                    cover one side of the spread during the animation and look like a
+                    blank/gray page.
+                  */}
                   {/* Bookmark Ribbon on top of spread */}
                   <button
                     type="button"
