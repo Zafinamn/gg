@@ -107,6 +107,20 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     side: "right" | "left" | "cover" | "backcover" | "single";
   } | null>(null);
 
+  // Touch-only gesture tracking. Mouse keeps the existing physical page-drag UX.
+  // On touch devices: swipe at 100% = page turn, pinch = zoom, one-finger drag
+  // while zoomed = pan.
+  const touchPointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const touchGesture = useRef({
+    mode: "idle" as "idle" | "swipe" | "pan" | "pinch",
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    startDistance: 0,
+    startZoom: 1,
+  });
+
   // Dedicated 3D transform values for smooth, independent leaf flips
   const coverRotateY = useMotionValue(0);
   const rightRotateY = useMotionValue(0);
@@ -567,7 +581,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         if (leftPage + 2 > totalPages) return;
       }
     } else if (side === "left" || side === "backcover") {
-      if (side === "left" && currentPage <= 2) return;
+      if (side === "left" && currentPage <= 1) return;
       if (side === "backcover" && currentPage <= 1) return;
     }
 
@@ -779,6 +793,141 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     setDragSide(null);
     dragPointerInfo.current = null;
     setDragActiveDirection(null);
+  };
+
+  // Touch gestures: pinch to zoom, one-finger pan while zoomed, and horizontal
+  // swipe to turn pages. Mouse keeps the existing page-grab interaction.
+  const getTouchPoints = () => Array.from(touchPointers.current.values());
+  const getTouchDistance = (points: { x: number; y: number }[]) => {
+    if (points.length < 2) return 0;
+    return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+  };
+  const clampZoom = (value: number) => Math.min(2.5, Math.max(0.75, +value.toFixed(2)));
+
+  const handleStagePointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const stage = stageViewportRef.current;
+    if (!stage) return;
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+
+    touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const points = getTouchPoints();
+    touchGesture.current.startX = e.clientX;
+    touchGesture.current.startY = e.clientY;
+    touchGesture.current.lastX = e.clientX;
+    touchGesture.current.lastY = e.clientY;
+
+    if (points.length >= 2) {
+      touchGesture.current.mode = "pinch";
+      touchGesture.current.startDistance = Math.max(1, getTouchDistance(points));
+      touchGesture.current.startZoom = zoom;
+    } else {
+      touchGesture.current.mode = zoom > 1 ? "pan" : "swipe";
+      touchGesture.current.startDistance = 0;
+      touchGesture.current.startZoom = zoom;
+    }
+  };
+
+  const handleStagePointerMoveCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch" || !touchPointers.current.has(e.pointerId)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const stage = stageViewportRef.current;
+    if (!stage) return;
+    const points = getTouchPoints();
+
+    if (points.length >= 2) {
+      const distance = Math.max(1, getTouchDistance(points));
+      const oldZoom = zoom;
+      const newZoom = clampZoom(touchGesture.current.startZoom * (distance / Math.max(1, touchGesture.current.startDistance)));
+      if (Math.abs(newZoom - oldZoom) > 0.005) {
+        const rect = stage.getBoundingClientRect();
+        const centerX = (points[0].x + points[1].x) / 2 - rect.left;
+        const centerY = (points[0].y + points[1].y) / 2 - rect.top;
+        setZoom(newZoom);
+        requestAnimationFrame(() => {
+          const ratio = newZoom / Math.max(0.01, oldZoom);
+          stage.scrollLeft = Math.max(0, (stage.scrollLeft + centerX) * ratio - centerX);
+          stage.scrollTop = Math.max(0, (stage.scrollTop + centerY) * ratio - centerY);
+        });
+      }
+      touchGesture.current.mode = "pinch";
+      return;
+    }
+
+    if (points.length === 1 && touchGesture.current.mode === "pan" && zoom > 1) {
+      const point = points[0];
+      stage.scrollLeft -= point.x - touchGesture.current.lastX;
+      stage.scrollTop -= point.y - touchGesture.current.lastY;
+      touchGesture.current.lastX = point.x;
+      touchGesture.current.lastY = point.y;
+    } else if (points.length === 1) {
+      touchGesture.current.lastX = points[0].x;
+      touchGesture.current.lastY = points[0].y;
+    }
+  };
+
+  const handleStagePointerUpCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const deltaX = e.clientX - touchGesture.current.startX;
+    const pointerCount = touchPointers.current.size;
+    touchPointers.current.delete(e.pointerId);
+    try { stageViewportRef.current?.releasePointerCapture(e.pointerId); } catch {}
+
+    // Never accidentally flip after a pinch.
+    if (pointerCount >= 2 || touchGesture.current.mode === "pinch") {
+      touchGesture.current.mode = touchPointers.current.size ? "pan" : "idle";
+      if (touchPointers.current.size === 1) {
+        const remaining = getTouchPoints()[0];
+        touchGesture.current.startX = remaining.x;
+        touchGesture.current.startY = remaining.y;
+        touchGesture.current.lastX = remaining.x;
+        touchGesture.current.lastY = remaining.y;
+      }
+      return;
+    }
+
+    if (touchGesture.current.mode === "swipe" && Math.abs(deltaX) > 42) {
+      if (deltaX < 0) turnPageForward();
+      else turnPageBackward();
+    }
+    touchGesture.current.mode = "idle";
+  };
+
+  const handleStagePointerCancelCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
+    touchPointers.current.delete(e.pointerId);
+    touchGesture.current.mode = "idle";
+    try { stageViewportRef.current?.releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  const handleStageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const stage = stageViewportRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const oldZoom = zoom;
+    const newZoom = oldZoom > 1.01 ? 1 : 2;
+    setZoom(newZoom);
+    requestAnimationFrame(() => {
+      const ratio = newZoom / Math.max(0.01, oldZoom);
+      stage.scrollLeft = Math.max(0, (stage.scrollLeft + localX) * ratio - localX);
+      stage.scrollTop = Math.max(0, (stage.scrollTop + localY) * ratio - localY);
+    });
   };
 
   // Keyboard navigation
@@ -1460,6 +1609,11 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         onMouseMove={handleMouseMoveLoupe}
         onMouseLeave={handleMouseLeaveLoupe}
         ref={stageViewportRef}
+        onDoubleClick={handleStageDoubleClick}
+        onPointerDownCapture={handleStagePointerDownCapture}
+        onPointerMoveCapture={handleStagePointerMoveCapture}
+        onPointerUpCapture={handleStagePointerUpCapture}
+        onPointerCancelCapture={handleStagePointerCancelCapture}
         className="relative flex-1 overflow-auto flex items-center justify-center p-4 sm:p-10 perspective-[2000px] bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 min-h-[460px] pb-24 select-none touch-none"
       >
         {/* Swipe & Gesture Hint Pill */}
@@ -1473,7 +1627,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
               className="absolute top-4 left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-full bg-slate-950/80 border border-slate-700/70 text-slate-300 text-xs font-medium backdrop-blur-md shadow-xl flex items-center gap-2 pointer-events-auto z-30"
             >
               <MoveHorizontal className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>Grab & drag page with Mouse 1 to flip</span>
+              <span>Mouse-оор чирж эргүүлнэ • 2 товшоод zoom • Утсаар swipe / pinch / drag</span>
               <button
                 type="button"
                 onClick={() => setShowSwipeHint(false)}
