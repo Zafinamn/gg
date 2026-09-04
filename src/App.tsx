@@ -42,48 +42,30 @@ export default function App() {
 
     const loadSharedCatalog = async () => {
       try {
-        // New share links carry the exact public Blob URL that was returned
-        // for the upload. This avoids depending on a metadata/index lookup.
-        if (directBlobUrl) {
-          const decodedUrl = directBlobUrl;
-          let blobUrl: URL;
+        // Shared links are intentionally self-contained at the catalog ID level.
+        // Resolve the actual public Blob URL server-side so the browser never
+        // has to infer/validate a Blob hostname from a stale upload URL.
+        let data: any = null;
+        let lastError: any = null;
+        for (let attempt = 0; attempt < 8; attempt++) {
           try {
-            blobUrl = new URL(decodedUrl);
-          } catch {
-            throw new Error("Каталогийн холбоос буруу байна.");
+            const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`, {
+              cache: "no-store",
+            });
+            const json = await response.json().catch(() => ({}));
+            if (response.ok && json?.url) {
+              data = json;
+              break;
+            }
+            lastError = new Error(json?.error || "Каталогийн холбоос олдсонгүй.");
+          } catch (fetchError) {
+            lastError = fetchError;
           }
-
-          // Signed PUT URLs can use a Blob storage hostname that does not
-          // literally contain the `.public.` label even for a public store.
-          // The previous strict hostname regex rejected valid share links
-          // before the browser ever attempted to load the PDF. Only require
-          // HTTPS + Vercel Blob storage here, then use the exact URL returned
-          // by the upload flow.
-          if (blobUrl.protocol !== "https:" || !blobUrl.hostname.endsWith(".blob.vercel-storage.com")) {
-            throw new Error("Каталогийн холбоос буруу байна.");
-          }
-
-          blobUrl.search = "";
-          blobUrl.hash = "";
-
-          if (cancelled) return;
-          setCurrentDoc({
-            id: catalogId,
-            name: "G&G Catalog.pdf",
-            size: 0,
-            base64: "",
-            blobUrl: "",
-            pdfUrl: blobUrl.toString(),
-          });
-          setUploadProgress(100);
-          return;
+          await new Promise((resolve) => window.setTimeout(resolve, 750));
         }
 
-        // Backward compatibility for older /share/:id links.
-        const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`);
-        const data = await response.json();
-        if (!response.ok || !data?.url) {
-          throw new Error(data?.error || "Каталогийн холбоос олдсонгүй.");
+        if (!data?.url) {
+          throw lastError || new Error("Каталогийн холбоос олдсонгүй.");
         }
 
         if (cancelled) return;

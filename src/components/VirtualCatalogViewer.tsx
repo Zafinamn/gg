@@ -1090,14 +1090,33 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         throw new Error(uploadError || "PDF-г Blob хадгалалт руу оруулахад алдаа гарлаа.");
       }
 
-      // The presigned PUT URL already identifies the exact Blob object.
-      // Remove only its temporary query string and carry that public object URL
-      // in the share link. This makes shared links self-contained and avoids
-      // a second storage/index lookup when someone opens the link.
-      const publicBlobUrl = new URL(presignData.presignedUrl);
-      publicBlobUrl.search = "";
+      // Resolve the final public Blob URL from Blob itself after the upload.
+      // Do not derive a public URL by stripping the signature from the PUT URL:
+      // a presigned upload URL is not necessarily the browser-readable object URL.
+      let catalogData: any = null;
+      let lastLookupError: any = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          const lookupResponse = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`, {
+            cache: "no-store",
+          });
+          const lookupJson = await lookupResponse.json().catch(() => ({}));
+          if (lookupResponse.ok && lookupJson?.url) {
+            catalogData = lookupJson;
+            break;
+          }
+          lastLookupError = new Error(lookupJson?.error || "Каталог Blob хадгалалтаас олдсонгүй.");
+        } catch (lookupError) {
+          lastLookupError = lookupError;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+
+      if (!catalogData?.url) {
+        throw lastLookupError || new Error("Каталогийн public холбоосыг олж чадсангүй.");
+      }
+
       const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin);
-      newShareUrl.searchParams.set("src", publicBlobUrl.toString());
       setShareUrl(newShareUrl.toString());
       setShowShareModal(true);
       setShareError(null);

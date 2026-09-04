@@ -13,15 +13,16 @@ export async function GET(request: Request): Promise<Response> {
       return Response.json({ error: 'Буруу каталогийн холбоос.' }, { status: 400 });
     }
 
-    const pathname = `catalogs/${id}.pdf`;
+    // The upload may be represented by an exact pathname or by a pathname
+    // with a Blob-generated suffix. Resolve by prefix and return the actual
+    // public object URL that Blob reports.
+    const prefix = `catalogs/${id}`;
+    const result = await list({ prefix, limit: 100 });
+    const candidates = result.blobs
+      .filter((item: any) => item.pathname.startsWith(prefix) && item.pathname.toLowerCase().endsWith('.pdf'))
+      .sort((a: any, b: any) => (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0) - (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0));
 
-    // Use list() to resolve the actual Blob object and its public URL.
-    // This is more robust for client/signed uploads because the URL can
-    // contain the Blob service's immutable object suffix even when the
-    // logical pathname is stable.
-    const result = await list({ prefix: pathname, limit: 20 });
-    const blob = result.blobs.find((item: any) => item.pathname === pathname)
-      || result.blobs.find((item: any) => item.pathname.startsWith(pathname));
+    const blob = candidates[0];
 
     if (!blob?.url) {
       return Response.json({ error: 'Каталогийн холбоос олдсонгүй.' }, { status: 404 });
@@ -35,12 +36,12 @@ export async function GET(request: Request): Promise<Response> {
       contentType: blob.contentType || 'application/pdf',
       pathname: blob.pathname,
     }, {
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' },
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error: any) {
     console.error('Catalog lookup error:', error);
     return Response.json({
       error: error?.message || 'Каталогийн холбоос олдсонгүй.'
-    }, { status: 404 });
+    }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
