@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { upload } from "@vercel/blob/client";
 import * as pdfjsLib from "pdfjs-dist";
 import {
   ChevronLeft,
@@ -1043,48 +1044,27 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
-
       const catalogId = crypto.randomUUID();
-      const tokenResponse = await fetch("/api/blob-upload", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          pathname: `catalogs/${catalogId}.pdf`,
+      const pathname = `catalogs/${catalogId}.pdf`;
+
+      const blob = await Promise.race([
+        upload(pathname, pdfBlob, {
+          access: "public",
+          handleUploadUrl: "/api/blob-upload",
+          multipart: true,
           contentType: "application/pdf",
         }),
-      });
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error("Холбоос үүсгэхэд хугацаа хэтэрлээ. Дахин оролдоно уу.")), 120000),
+        ),
+      ]);
 
-      let tokenData: any = null;
-      try {
-        tokenData = await tokenResponse.json();
-      } catch {
-        tokenData = null;
-      }
-
-      if (!tokenResponse.ok || !tokenData?.presignedUrl) {
-        throw new Error(
-          tokenData?.error || `Vercel Blob URL үүсгэхэд алдаа гарлаа (${tokenResponse.status}).`,
-        );
-      }
-
-      const uploadResponse = await fetch(tokenData.presignedUrl, {
-        method: "PUT",
-        headers: { "content-type": "application/pdf" },
-        body: pdfBlob,
-      });
-
-      if (!uploadResponse.ok) {
-        let uploadError = "Каталог Blob-д хадгалагдсангүй.";
-        try {
-          const text = await uploadResponse.text();
-          if (text) uploadError = `${uploadError} ${text}`;
-        } catch {}
-        throw new Error(uploadError);
-      }
+      if (!blob?.url) throw new Error("Share холбоос үүссэнгүй.");
 
       const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
       setShareUrl(newShareUrl);
       setShowShareModal(true);
+      setShareError(null);
     } catch (error: any) {
       console.error("Share catalog error:", error);
       setShareError(error?.message || "Хуваалцах холбоос үүсгэж чадсангүй.");
