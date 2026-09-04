@@ -964,47 +964,54 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     }
   };
 
-  // Clipboard helper. Use the modern Clipboard API first so the browser
-  // itself confirms the write. Only fall back to the legacy copy command if
-  // the API is unavailable/rejected. Never report success from a failed path.
+  // Reliable URL copy for Chrome/Vercel deployments.
+  // Keep the actual copy call inside the button click flow and use a real
+  // visible-to-selection textarea for the legacy path.
   const copyTextToClipboard = async (text: string) => {
-    // Modern secure-context clipboard. This is the authoritative path.
-    if (window.isSecureContext && navigator.clipboard?.writeText) {
+    // Preferred: Clipboard API with a plain-text ClipboardItem.
+    if (window.isSecureContext && navigator.clipboard) {
       try {
-        await navigator.clipboard.writeText(text);
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+          const item = new ClipboardItem({
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          });
+          await navigator.clipboard.write([item]);
+        } else if (navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          throw new Error("Clipboard API unavailable");
+        }
         return true;
       } catch (error) {
-        console.warn("Clipboard API write failed, trying legacy copy:", error);
+        console.warn("Clipboard API failed, trying selection fallback:", error);
       }
     }
 
-    // Legacy fallback for browsers/contexts where Clipboard API is blocked.
+    // Fallback: select an actual textarea and issue copy synchronously.
     try {
       const textarea = document.createElement("textarea");
       textarea.value = text;
-      textarea.setAttribute("readonly", "true");
+      textarea.readOnly = true;
       textarea.setAttribute("aria-hidden", "true");
       textarea.style.position = "fixed";
-      textarea.style.top = "50%";
-      textarea.style.left = "50%";
-      textarea.style.width = "2px";
-      textarea.style.height = "2px";
-      textarea.style.padding = "0";
-      textarea.style.border = "0";
-      textarea.style.outline = "0";
-      textarea.style.opacity = "0";
-      textarea.style.zIndex = "-1";
+      textarea.style.left = "8px";
+      textarea.style.top = "8px";
+      textarea.style.width = "calc(100vw - 16px)";
+      textarea.style.height = "24px";
+      textarea.style.opacity = "0.01";
+      textarea.style.pointerEvents = "none";
+      textarea.style.zIndex = "2147483647";
       document.body.appendChild(textarea);
 
-      textarea.focus();
+      textarea.focus({ preventScroll: true });
       textarea.select();
-      textarea.setSelectionRange(0, textarea.value.length);
+      textarea.setSelectionRange(0, text.length);
       const copied = document.execCommand("copy");
+      textarea.blur();
       textarea.remove();
-
       return copied;
     } catch (error) {
-      console.warn("Legacy clipboard copy failed:", error);
+      console.warn("Selection clipboard fallback failed:", error);
       return false;
     }
   };
