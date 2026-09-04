@@ -1046,16 +1046,17 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
       const catalogId = crypto.randomUUID();
       const pathname = `catalogs/${catalogId}.pdf`;
+      const useMultipart = pdfBlob.size > 4 * 1024 * 1024;
 
       const blob = await Promise.race([
         upload(pathname, pdfBlob, {
           access: "public",
           handleUploadUrl: "/api/blob-upload",
-          multipart: true,
+          multipart: useMultipart,
           contentType: "application/pdf",
         }),
         new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error("Холбоос үүсгэхэд хугацаа хэтэрлээ. Дахин оролдоно уу.")), 120000),
+          window.setTimeout(() => reject(new Error("PDF-г хадгалахад хугацаа хэтэрлээ. Интернэтээ шалгаад дахин оролдоно уу.")), 120000),
         ),
       ]);
 

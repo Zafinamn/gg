@@ -1,20 +1,12 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# G&G PDF Catalog Viewer
 
-# Run and deploy your AI Studio app
+React + Vite PDF catalog viewer with Vercel Blob share/export links.
 
-This contains everything you need to run your app locally.
+## Vercel
+1. Connect the Vercel Blob store to this project.
+2. The store should be **Public** because shared catalog PDFs are served directly by their Blob URLs.
+3. Deploy/redeploy this project.
 
-View your app in AI Studio: https://ai.studio/apps/ef611148-7fcd-49e9-95cc-f42082e8bde7
+The Share button uploads the current PDF to Vercel Blob using the standard `@vercel/blob/client` flow, then creates a clean `/share/<id>` viewer link.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Shared links open directly in the catalog viewer and do not expose the upload-homepage flow.

@@ -1,5 +1,9 @@
 import { handleUpload } from "@vercel/blob/client";
 
+function validCatalogPath(pathname: string): boolean {
+  return /^catalogs\/[a-f0-9-]{20,64}\.pdf$/i.test(pathname);
+}
+
 export default async function handler(request: Request): Promise<Response> {
   try {
     if (request.method !== "POST") {
@@ -12,7 +16,7 @@ export default async function handler(request: Request): Promise<Response> {
       body,
       request,
       onBeforeGenerateToken: async (pathname: string) => {
-        if (!/^catalogs\/[a-f0-9-]{20,64}\.pdf$/i.test(pathname)) {
+        if (!validCatalogPath(pathname)) {
           throw new Error("Invalid catalog path.");
         }
 
@@ -23,17 +27,18 @@ export default async function handler(request: Request): Promise<Response> {
           tokenPayload: JSON.stringify({ purpose: "catalog-share" }),
         };
       },
-      onUploadCompleted: async () => {
-        // No database write is required here. The pathname itself is the catalog ID.
+      onUploadCompleted: async ({ blob }: any) => {
+        console.info("Catalog upload completed:", blob?.pathname || "unknown");
       },
     });
 
     return Response.json(response);
   } catch (error: any) {
-    console.error("Blob client token error:", error);
+    console.error("Blob upload endpoint error:", error);
+    const message = error?.message || "Blob upload тохиргоонд алдаа гарлаа.";
     return Response.json(
-      { error: error?.message || "Blob upload token үүсгэж чадсангүй." },
-      { status: 500 },
+      { error: message },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
