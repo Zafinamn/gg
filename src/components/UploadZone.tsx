@@ -24,11 +24,11 @@ interface UploadZoneProps {
 }
 
 const features = [
-  { icon: BookOpen, title: "Realistic Page Flip", text: "Browse catalogs like a real book." },
-  { icon: Search, title: "Zoom & Loupe", text: "Inspect products and fine details." },
-  { icon: BrainCircuit, title: "AI Analysis", text: "Turn documents into useful insights." },
-  { icon: FileSearch, title: "Smart Search", text: "Find content across your PDF fast." },
-  { icon: Maximize2, title: "Fullscreen", text: "Enjoy a clean reading experience." },
+  { icon: BookOpen, title: "Бодит хуудас эргүүлэлт", text: "Каталогоо жинхэнэ ном шиг үзээрэй." },
+  { icon: Search, title: "Zoom & Loupe", text: "Бүтээгдэхүүн болон жижиг деталийг тодорхой харна." },
+  { icon: BrainCircuit, title: "AI дүн шинжилгээ", text: "Баримтаас хэрэгтэй мэдээллийг хурдан гаргана." },
+  { icon: FileSearch, title: "Ухаалаг хайлт", text: "PDF дотроос хэрэгтэй мэдээллээ хурдан олоорой." },
+  { icon: Maximize2, title: "Дэлгэц дүүрэн харах", text: "Цэвэр, тухтай унших орчин." },
 ];
 
 export const UploadZone: React.FC<UploadZoneProps> = ({
@@ -49,16 +49,16 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf) {
-      setLocalError("Please upload a valid PDF catalog. Other document formats are not supported.");
+      setLocalError("Зөв PDF каталог файл оруулна уу. Бусад төрлийн баримтыг дэмжихгүй.");
       return;
     }
     const MAX_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      setLocalError("This PDF exceeds the 100MB size limit. Please select a smaller file.");
+      setLocalError("Энэ PDF 100MB-ийн хязгаараас хэтэрсэн байна. Бага хэмжээтэй файл сонгоно уу.");
       return;
     }
     if (file.size === 0) {
-      setLocalError("The selected PDF file appears to be empty. Please choose another file.");
+      setLocalError("Сонгосон PDF файл хоосон байна. Өөр файл сонгоно уу.");
       return;
     }
 
@@ -66,7 +66,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     reader.onload = () => {
       onFileSelected({ base64: reader.result as string, name: file.name, size: file.size });
     };
-    reader.onerror = () => setLocalError("Failed to read the selected PDF file. Please try again.");
+    reader.onerror = () => setLocalError("PDF файлыг уншихад алдаа гарлаа. Дахин оролдоно уу.");
     reader.readAsDataURL(file);
   };
 
@@ -92,15 +92,15 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
         <div className="relative max-w-2xl">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-400/20 bg-indigo-500/[0.08] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-300">
-              <Sparkles className="h-3.5 w-3.5" /> Smart PDF Experience
+              <Sparkles className="h-3.5 w-3.5" /> Ухаалаг PDF туршлага
             </div>
             <h1 className="text-5xl font-black leading-[0.98] tracking-[-0.045em] text-white sm:text-6xl xl:text-[78px]">
-              Your PDFs
+              Таны PDF файлууд
               <br />
-              <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">Smarter &amp; Interactive</span>
+              <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">Илүү ухаалаг, интерактив</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-400 sm:text-lg">
-              Upload, analyze, and explore your PDFs like never before with AI. Turn documents into an interactive catalog experience.
+              PDF файлаа байршуулж, дүн шинжилгээ хийж, урьд өмнөхөөс илүү хялбар судлаарай. Баримтаа интерактив каталог болгон ашиглаарай.
             </p>
           </motion.div>
 
@@ -126,11 +126,11 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           </div>
 
           <div className="mt-8 hidden items-center gap-7 text-sm text-slate-500 md:flex">
-            <span className="flex items-center gap-2"><MousePointer2 className="h-4 w-4 text-indigo-300" /> Drag &amp; drop</span>
+            <span className="flex items-center gap-2"><MousePointer2 className="h-4 w-4 text-indigo-300" /> Чирж оруулах</span>
             <span className="h-4 w-px bg-white/10" />
-            <span className="flex items-center gap-2"><Volume2 className="h-4 w-4 text-indigo-300" /> Page turn audio</span>
+            <span className="flex items-center gap-2"><Volume2 className="h-4 w-4 text-indigo-300" /> Хуудас эргүүлэх дуу</span>
             <span className="h-4 w-px bg-white/10" />
-            <span className="flex items-center gap-2"><FolderOpen className="h-4 w-4 text-indigo-300" /> Up to 100MB</span>
+            <span className="flex items-center gap-2"><FolderOpen className="h-4 w-4 text-indigo-300" /> 100MB хүртэл</span>
           </div>
         </div>
 
@@ -159,33 +159,22 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[24px] border border-indigo-300/15 bg-gradient-to-br from-indigo-500/15 to-violet-500/10 text-indigo-300 shadow-[0_15px_45px_rgba(79,70,229,0.15)] transition duration-300 group-hover:scale-105 group-hover:border-indigo-300/30">
                 <UploadCloud className="h-9 w-9" />
               </div>
-              <p className="text-2xl font-bold tracking-tight text-white">Drop your PDF here</p>
-              <p className="mt-2 text-sm text-slate-400">or click to browse from your device</p>
+              <p className="text-2xl font-bold tracking-tight text-white">PDF файлаа энд чирж оруулна уу</p>
+              <p className="mt-2 text-sm text-slate-400">эсвэл төхөөрөмжөөсөө сонгоно уу</p>
 
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                 className="mt-7 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 px-7 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(79,70,229,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_15px_40px_rgba(79,70,229,0.36)] active:translate-y-0"
               >
-                <FolderOpen className="h-4 w-4" /> Choose PDF File <ArrowUpRight className="h-4 w-4 opacity-70" />
+                <FolderOpen className="h-4 w-4" /> PDF файл сонгох <ArrowUpRight className="h-4 w-4 opacity-70" />
               </button>
-              <p className="mt-4 text-xs text-slate-500">PDF files only · Maximum size 100MB</p>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><BrainCircuit className="h-4 w-4" /></div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-200">AI-Powered Insights</p>
-                  <p className="text-[10px] text-slate-500">Analyze and understand your documents faster.</p>
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-slate-600" />
+              <p className="mt-4 text-xs text-slate-500">Зөвхөн PDF файл · Дээд хэмжээ 100MB</p>
             </div>
 
             {isUploading && (
               <div className="mt-5 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
-                <div className="mb-2 flex justify-between text-xs font-medium text-slate-300"><span>Loading catalog...</span><span>{Math.round(uploadProgress)}%</span></div>
+                <div className="mb-2 flex justify-between text-xs font-medium text-slate-300"><span>Каталог ачаалж байна...</span><span>{Math.round(uploadProgress)}%</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-200" style={{ width: `${uploadProgress}%` }} /></div>
               </div>
             )}
@@ -194,9 +183,9 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       </div>
 
       <div className="mt-12 grid grid-cols-3 divide-x divide-white/[0.08] border-y border-white/[0.07] py-6 sm:mt-14">
-        <div className="text-center"><p className="text-xl font-black text-white sm:text-2xl">100MB</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">PDF capacity</p></div>
-        <div className="text-center"><p className="text-xl font-black text-indigo-300 sm:text-2xl">AI</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">Powered analysis</p></div>
-        <div className="text-center"><p className="text-xl font-black text-white sm:text-2xl">3D</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">Catalog viewing</p></div>
+        <div className="text-center"><p className="text-xl font-black text-white sm:text-2xl">100MB</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">PDF багтаамж</p></div>
+        <div className="text-center"><p className="text-xl font-black text-indigo-300 sm:text-2xl">AI</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">Ухаалаг дүн шинжилгээ</p></div>
+        <div className="text-center"><p className="text-xl font-black text-white sm:text-2xl">3D</p><p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">Каталог үзэх</p></div>
       </div>
 
       {activeError && (
@@ -207,8 +196,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       )}
 
       <footer className="mt-8 flex flex-col items-center justify-between gap-2 text-[11px] text-slate-600 sm:flex-row">
-        <span>© 2025 GG. All rights reserved.</span>
-        <span className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Powered by Gemini AI</span>
+        <span>© 2025 GG. Бүх эрх хуулиар хамгаалагдсан.</span>
       </footer>
     </section>
   );

@@ -26,10 +26,10 @@ export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew }) 
             <div className="flex items-center gap-2">
               <span className="truncate text-base font-bold tracking-tight text-white sm:text-lg">GG</span>
               <span className="hidden h-4 w-px bg-white/15 sm:block" />
-              <span className="hidden truncate text-sm text-slate-300 sm:block">PDF AI Analyzer &amp; Catalog Viewer</span>
+              <span className="hidden truncate text-sm text-slate-300 sm:block">PDF AI Analyzer · Каталог үзүүлэгч</span>
             </div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-indigo-300/80">
-              <Sparkles className="h-3 w-3" /> Smart PDF Experience
+              <Sparkles className="h-3 w-3" /> Ухаалаг PDF туршлага
             </div>
           </div>
         </div>
@@ -49,14 +49,14 @@ export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew }) 
                 className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-400/20 bg-indigo-500/15 px-3.5 py-2 text-xs font-semibold text-indigo-200 transition hover:border-indigo-300/30 hover:bg-indigo-500/25 active:scale-95"
               >
                 <UploadCloud className="h-4 w-4" />
-                <span className="hidden sm:inline">Upload Catalog</span>
+                <span className="hidden sm:inline">Каталог оруулах</span>
                 <span className="sm:hidden">New</span>
               </button>
             </>
           ) : (
             <>
               <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs text-slate-300 sm:flex">
-                <BookOpen className="h-3.5 w-3.5 text-indigo-300" /> Interactive Catalog
+                <BookOpen className="h-3.5 w-3.5 text-indigo-300" /> Интерактив каталог
               </div>
               <button type="button" aria-label="Theme" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-white/20 hover:bg-white/[0.08]">
                 <Moon className="h-4 w-4" />
