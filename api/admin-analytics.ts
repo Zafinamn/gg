@@ -83,17 +83,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
     }
 
+    // Load every named link first so links with zero opens still appear in Admin.
     const linkMap = new Map<string, any>();
+    try {
+      const named = [];
+      let namedCursor: string | undefined;
+      for (let page = 0; page < 20; page++) {
+        const result = await list({ prefix: 'share-links/named/', limit: 1000, ...(namedCursor ? { cursor: namedCursor } : {}) });
+        named.push(...result.blobs);
+        if (!result.hasMore || !result.cursor) break;
+        namedCursor = result.cursor;
+      }
+      for (const blob of named) {
+        try {
+          const response = await fetch(blob.url, { cache: 'no-store' });
+          if (!response.ok) continue;
+          const record = await response.json();
+          if (!record?.linkId) continue;
+          linkMap.set(String(record.linkId), {
+            id: String(record.linkId),
+            slug: String(record.slug || ''),
+            name: String(record.name || 'Нэргүй холбоос'),
+            catalogId: String(record.catalogId || ''),
+            filename: String(record.filename || 'G&G Catalog.pdf'),
+            opens: 0,
+            lastOpenedAt: null,
+          });
+        } catch {}
+      }
+    } catch (error) {
+      console.error('Named link metadata read error:', error);
+    }
+
     for (const event of events) {
-      const linkId = event.linkId || event.catalogId;
-      const link = linkMap.get(linkId) || {
+      const linkId = String(event.linkId || event.catalogId || '');
+      if (!linkId) continue;
+      const existing = linkMap.get(linkId);
+      const link = existing || {
         id: linkId,
+        slug: '',
         name: event.linkName || 'Үндсэн холбоос',
         catalogId: event.catalogId,
         filename: event.filename || 'G&G Catalog.pdf',
         opens: 0,
         lastOpenedAt: null,
       };
+      // Current named-link metadata is authoritative for the display name.
+      if (!existing && event.linkName) link.name = event.linkName;
+      link.catalogId = link.catalogId || event.catalogId;
+      link.filename = link.filename || event.filename || 'G&G Catalog.pdf';
       link.opens += 1;
       if (!link.lastOpenedAt || new Date(event.timestamp) > new Date(link.lastOpenedAt)) {
         link.lastOpenedAt = event.timestamp;

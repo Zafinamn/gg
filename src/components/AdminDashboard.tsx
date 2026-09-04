@@ -33,6 +33,9 @@ export const AdminDashboard: React.FC = () => {
   const [createdLink, setCreatedLink] = useState('');
   const [createdLinkCopied, setCreatedLinkCopied] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [editingLinkName, setEditingLinkName] = useState('');
+  const [savingLinkName, setSavingLinkName] = useState(false);
 
   const maxDaily = Math.max(1, ...((data?.daily || []).map((d) => d.opens)));
   const countries = useMemo(() => {
@@ -99,6 +102,23 @@ export const AdminDashboard: React.FC = () => {
     finally { setCreatingLink(false); }
   };
 
+  const renameLink = async (linkId: string) => {
+    if (!token || !editingLinkName.trim()) return;
+    setSavingLinkName(true); setError('');
+    try {
+      const r = await fetch('/api/admin-share-links', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ linkId, name: editingLinkName.trim() }),
+      });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json.error || 'Нэр солих үед алдаа гарлаа.');
+      setEditingLinkId(null); setEditingLinkName('');
+      await load(token);
+    } catch (e: any) { setError(e?.message || 'Нэр солих үед алдаа гарлаа.'); }
+    finally { setSavingLinkName(false); }
+  };
+
   const copy = async (value: string) => {
     try { await navigator.clipboard.writeText(value); return true; } catch {
       const el = document.createElement('textarea'); el.value = value; document.body.appendChild(el); el.select(); document.execCommand('copy'); el.remove(); return true;
@@ -134,7 +154,7 @@ export const AdminDashboard: React.FC = () => {
           {createdLink && <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4"><div className="mb-2 font-semibold text-emerald-200">Холбоос бэлэн</div><div className="break-all text-sm text-slate-300">{createdLink}</div><div className="mt-3 flex flex-wrap gap-2"><button onClick={async()=>{await copy(createdLink); setCreatedLinkCopied(true);}} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 px-3 py-2 text-sm hover:bg-white/5"><Copy className="h-4 w-4" /> {createdLinkCopied ? 'Хуулсан' : 'Хуулах'}</button></div></div>}
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"><h2 className="mb-4 font-semibold">Холбоос бүрээр</h2><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-slate-500"><tr><th className="pb-3">Нэр</th><th className="pb-3">Каталог</th><th className="pb-3">Нээлт</th><th className="pb-3">Сүүлд</th><th className="pb-3">Холбоос</th></tr></thead><tbody>{(data?.links || []).map((l) => { const url = linkUrl(l.id, l.slug); return <tr key={l.id} className="border-t border-white/5"><td className="py-3"><div className="font-medium">{l.name}</div><div className="text-xs text-slate-500">ID: {l.id}</div></td><td className="py-3">{l.filename}</td><td className="py-3 font-semibold text-indigo-200">{l.opens}</td><td className="py-3 text-slate-400">{l.lastOpenedAt ? new Date(l.lastOpenedAt).toLocaleString('mn-MN') : '—'}</td><td className="py-3"><button onClick={()=>copy(url)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs hover:bg-white/5"><Copy className="h-3.5 w-3.5" /> Хуулах</button></td></tr>; })}{!(data?.links || []).length && <tr><td colSpan={5} className="py-6 text-center text-slate-500">Одоогоор тусдаа холбоос алга.</td></tr>}</tbody></table></div></section>
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"><h2 className="mb-4 font-semibold">Холбоос бүрээр</h2><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-slate-500"><tr><th className="pb-3">Нэр</th><th className="pb-3">Каталог</th><th className="pb-3">Нээлт</th><th className="pb-3">Сүүлд</th><th className="pb-3">Холбоос</th><th className="pb-3">Үйлдэл</th></tr></thead><tbody>{(data?.links || []).map((l) => { const url = linkUrl(l.id, l.slug); const editing = editingLinkId === l.id; return <tr key={l.id} className="border-t border-white/5"><td className="py-3">{editing ? <div className="flex flex-wrap gap-2"><input value={editingLinkName} onChange={(e)=>setEditingLinkName(e.target.value)} className="min-w-[180px] rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-sm outline-none focus:border-indigo-400" autoFocus /><button disabled={savingLinkName} onClick={()=>renameLink(l.id)} className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-400 disabled:opacity-50">Хадгалах</button><button onClick={()=>{setEditingLinkId(null);setEditingLinkName('')}} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs">Цуцлах</button></div> : <><div className="font-medium">{l.name}</div><div className="text-xs text-slate-500">ID: {l.id}</div></>}</td><td className="py-3">{l.filename}</td><td className="py-3 font-semibold text-indigo-200">{l.opens}</td><td className="py-3 text-slate-400">{l.lastOpenedAt ? new Date(l.lastOpenedAt).toLocaleString('mn-MN') : '—'}</td><td className="py-3"><button onClick={()=>copy(url)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs hover:bg-white/5"><Copy className="h-3.5 w-3.5" /> Хуулах</button></td><td className="py-3">{!editing && <button onClick={()=>{setEditingLinkId(l.id);setEditingLinkName(l.name)}} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs hover:bg-white/5">Нэр солих</button>}</td></tr>; })}{!(data?.links || []).length && <tr><td colSpan={6} className="py-6 text-center text-slate-500">Одоогоор тусдаа холбоос алга.</td></tr>}</tbody></table></div></section>
 
         <section className="grid gap-6 lg:grid-cols-[1.7fr_1fr]"><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Нээлтийн газрын зураг</h2><span className="text-xs text-slate-500">IP-д суурилсан ойролцоо байршил</span></div><div ref={setMapEl} className="h-[420px] overflow-hidden rounded-2xl" /></div><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"><h2 className="mb-4 font-semibold">Улсаар</h2><div className="space-y-3">{countries.slice(0,10).map(([country,opens])=><div key={country} className="flex items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2"><span>{country || '—'}</span><span className="font-semibold text-indigo-200">{opens}</span></div>)}{!countries.length&&<p className="text-sm text-slate-500">Одоогоор мэдээлэл алга.</p>}</div></div></section>
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"><h2 className="mb-4 font-semibold">Каталог бүрээр</h2><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-slate-500"><tr><th className="pb-3">Каталог</th><th className="pb-3">Нээлт</th><th className="pb-3">Сүүлд нээсэн</th><th className="pb-3">ID</th></tr></thead><tbody>{(data?.catalogs||[]).map(c=><tr key={c.id} className="border-t border-white/5"><td className="py-3 font-medium">{c.filename}</td><td className="py-3 font-semibold">{c.opens}</td><td className="py-3 text-slate-400">{c.lastOpenedAt?new Date(c.lastOpenedAt).toLocaleString('mn-MN'):'—'}</td><td className="py-3 text-xs text-slate-500">{c.id}</td></tr>)}</tbody></table></div></section>

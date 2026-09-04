@@ -7,6 +7,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const payload = {
       catalogId: String(body.catalogId || ''),
+      linkId: String(body.linkId || body.catalogId || ''),
+      linkName: String(body.linkName || ''),
       filename: String(body.filename || 'G&G Catalog.pdf'),
       timestamp: new Date().toISOString(),
       country: String(req.headers['x-vercel-ip-country'] || ''),

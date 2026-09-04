@@ -61,6 +61,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ links });
     }
 
+    if (req.method === 'PATCH') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const linkId = clean(body?.linkId, 100);
+      const newName = clean(body?.name, 100);
+      if (!linkId || !newName) return res.status(400).json({ error: 'Холбоосын нэр оруулна уу.' });
+
+      const blobs = await listAll('share-links/named/');
+      for (const blob of blobs) {
+        try {
+          const response = await fetch(blob.url, { cache: 'no-store' });
+          if (!response.ok) continue;
+          const record = await response.json();
+          if (String(record?.linkId || '') !== linkId) continue;
+
+          const updated = { ...record, name: newName, updatedAt: new Date().toISOString() };
+          await put(String(blob.pathname), JSON.stringify(updated), {
+            access: 'public',
+            contentType: 'application/json',
+            addRandomSuffix: false,
+            cacheControlMaxAge: 31536000,
+          });
+          return res.status(200).json({ ok: true, linkId, slug: record.slug, name: newName });
+        } catch {}
+      }
+      return res.status(404).json({ error: 'Холбоос олдсонгүй.' });
+    }
+
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
