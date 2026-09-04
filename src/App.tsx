@@ -32,6 +32,8 @@ export default function App() {
     if (!match) return;
 
     const catalogId = decodeURIComponent(match[1]);
+    const shareParams = new URLSearchParams(window.location.search);
+    const directBlobUrl = shareParams.get("src");
     setIsSharedView(true);
     setErrorMessage(null);
     setUploadProgress(35);
@@ -40,6 +42,28 @@ export default function App() {
 
     const loadSharedCatalog = async () => {
       try {
+        // New share links carry the exact public Blob URL that was returned
+        // for the upload. This avoids depending on a metadata/index lookup.
+        if (directBlobUrl) {
+          const decodedUrl = directBlobUrl;
+          if (!/^https:\/\/.+\.public\.blob\.vercel-storage\.com\//i.test(decodedUrl)) {
+            throw new Error("Каталогийн холбоос буруу байна.");
+          }
+
+          if (cancelled) return;
+          setCurrentDoc({
+            id: catalogId,
+            name: "G&G Catalog.pdf",
+            size: 0,
+            base64: "",
+            blobUrl: "",
+            pdfUrl: decodedUrl,
+          });
+          setUploadProgress(100);
+          return;
+        }
+
+        // Backward compatibility for older /share/:id links.
         const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`);
         const data = await response.json();
         if (!response.ok || !data?.url) {
@@ -47,7 +71,6 @@ export default function App() {
         }
 
         if (cancelled) return;
-
         setCurrentDoc({
           id: data.id || catalogId,
           name: data.filename || "G&G Catalog.pdf",

@@ -1090,8 +1090,15 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         throw new Error(uploadError || "PDF-г Blob хадгалалт руу оруулахад алдаа гарлаа.");
       }
 
-      const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
-      setShareUrl(newShareUrl);
+      // The presigned PUT URL already identifies the exact Blob object.
+      // Remove only its temporary query string and carry that public object URL
+      // in the share link. This makes shared links self-contained and avoids
+      // a second storage/index lookup when someone opens the link.
+      const publicBlobUrl = new URL(presignData.presignedUrl);
+      publicBlobUrl.search = "";
+      const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin);
+      newShareUrl.searchParams.set("src", publicBlobUrl.toString());
+      setShareUrl(newShareUrl.toString());
       setShowShareModal(true);
       setShareError(null);
     } catch (error: any) {
