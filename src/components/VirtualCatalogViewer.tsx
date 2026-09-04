@@ -26,6 +26,9 @@ import {
   SlidersHorizontal,
   MoveHorizontal,
   Hand,
+  Share2,
+  Link2,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "motion/react";
 import { soundEffects } from "../utils/soundEffects";
@@ -38,11 +41,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 interface VirtualCatalogViewerProps {
   pdfBase64: string;
   filename: string;
+  isSharedView?: boolean;
 }
 
 export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   pdfBase64,
   filename,
+  isSharedView = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageViewportRef = useRef<HTMLDivElement>(null);
@@ -70,6 +75,9 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1); // In double mode, represents cover (1) or left page (even)
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   // Viewing Modes
   const [spreadMode, setSpreadMode] = useState<SpreadViewMode>("double");
@@ -948,6 +956,40 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   };
 
   // Spread calculation for labels
+  const handleShareCatalog = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    setShareError(null);
+    try {
+      const response = await fetch("/api/catalogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, fileSize: Math.round((pdfBase64.length * 3) / 4), pdfBase64 }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.id) throw new Error(data?.error || "Хуваалцах холбоос үүсгэж чадсангүй.");
+      const shareUrl = new URL(`/share/${data.id}`, window.location.origin).toString();
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2200);
+    } catch (error: any) {
+      console.error("Share catalog error:", error);
+      setShareError(error?.message || "Хуваалцах холбоос үүсгэж чадсангүй.");
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleCopyCurrentShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2200);
+    } catch {
+      setShareError("Холбоосыг автоматаар хуулж чадсангүй.");
+    }
+  };
+
   const isCover = spreadMode === "double" && currentPage === 1;
   const isBackCover = spreadMode === "double" && totalPages >= 4 && totalPages % 2 === 0 && currentPage === totalPages;
   const leftPageNumber = currentPage % 2 === 0 ? currentPage : currentPage - 1;
@@ -1098,6 +1140,21 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             )}
           </button>
 
+          {/* Share / Export Link */}
+          <button
+            type="button"
+            onClick={isSharedView ? handleCopyCurrentShareLink : handleShareCatalog}
+            disabled={isSharing}
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              shareCopied
+                ? "bg-emerald-600 text-white border-emerald-500"
+                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+            } disabled:opacity-60`}
+            title={isSharedView ? "Холбоос хуулах" : "Каталогийн холбоос үүсгэх"}
+          >
+            {shareCopied ? <Check className="w-4 h-4" /> : isSharedView ? <Link2 className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+          </button>
+
           {/* Fullscreen Button */}
           <button
             type="button"
@@ -1109,6 +1166,23 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {(shareCopied || shareError) && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`absolute right-5 top-16 z-50 rounded-xl border px-3 py-2 text-xs font-semibold shadow-xl backdrop-blur-xl ${
+              shareError
+                ? "border-red-400/20 bg-red-950/90 text-red-200"
+                : "border-emerald-400/20 bg-emerald-950/90 text-emerald-200"
+            }`}
+          >
+            {shareError || "Холбоос бэлэн — clipboard-д хууллаа."}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* In-Catalog Search Bar Overlay */}
       <AnimatePresence>

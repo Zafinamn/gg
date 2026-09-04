@@ -8,9 +8,10 @@ interface HeaderProps {
   onUploadNew: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  isSharedView?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew, isDarkMode, onToggleTheme }) => {
+export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew, isDarkMode, onToggleTheme, isSharedView = false }) => {
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -52,16 +53,18 @@ export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew, is
                 <span className="max-w-[180px] truncate font-semibold">{currentDocument.name}</span>
                 <span className={isDarkMode ? "text-slate-500" : "text-slate-400"}>{formatSize(currentDocument.size)}</span>
               </div>
-              <button
-                id="btn-header-upload-new"
-                type="button"
-                onClick={onUploadNew}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3.5 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-500/15 active:scale-95 dark:text-indigo-200"
-              >
-                <UploadCloud className="h-4 w-4" />
-                <span className="hidden sm:inline">Шинэ PDF оруулах</span>
-                <span className="sm:hidden">Шинэ</span>
-              </button>
+              {!isSharedView && (
+                <button
+                  id="btn-header-upload-new"
+                  type="button"
+                  onClick={onUploadNew}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3.5 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-500/15 active:scale-95 dark:text-indigo-200"
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  <span className="hidden sm:inline">Шинэ PDF оруулах</span>
+                  <span className="sm:hidden">Шинэ</span>
+                </button>
+              )}
             </>
           ) : (
             <div className="flex items-center gap-2">

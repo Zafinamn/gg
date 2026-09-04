@@ -68,9 +68,6 @@ export const UploadZone: React.FC<UploadZoneProps> = ({ onFileSelected, isUpload
               <br />
               хялбар үзээрэй
             </h1>
-            <p className={`mt-5 max-w-xl text-[15px] leading-7 sm:text-base ${muted}`}>
-              PDF файлаа оруулаад хуудас эргүүлэх, томруулах, хайх зэрэг хэрэгслээр илүү тухтай үзээрэй.
-            </p>
           </motion.div>
 
           <div className="mt-7 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
