@@ -1,0 +1,6 @@
+{
+  "name": "G&G International Catalog",
+  "description": "Interactive Digital Catalog reader with realistic 3D page flipping, 2-page spreads, magnifier loupe, and catalog navigation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
