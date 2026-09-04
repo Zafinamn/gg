@@ -34,18 +34,21 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "
 import { soundEffects } from "../utils/soundEffects";
 import { SpreadViewMode, CatalogBookmark } from "../types";
 import { GGLogo } from "./GGLogo";
+import { upload } from "@vercel/blob/client";
 
 // Configure pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 interface VirtualCatalogViewerProps {
   pdfBase64: string;
+  pdfUrl?: string;
   filename: string;
   isSharedView?: boolean;
 }
 
 export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   pdfBase64,
+  pdfUrl,
   filename,
   isSharedView = false,
 }) => {
@@ -174,18 +177,25 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
 
     const loadPdf = async () => {
       try {
-        const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
-        const binaryString = atob(cleanBase64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const loadingTask = pdfjsLib.getDocument({
-          data: bytes,
-          cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
-          cMapPacked: true,
-        });
+        const loadingTask = pdfUrl
+          ? pdfjsLib.getDocument({
+              url: pdfUrl,
+              cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
+              cMapPacked: true,
+            })
+          : (() => {
+              const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+              const binaryString = atob(cleanBase64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              return pdfjsLib.getDocument({
+                data: bytes,
+                cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
+                cMapPacked: true,
+              });
+            })();
 
         const doc = await loadingTask.promise;
         if (isMounted) {
@@ -207,7 +217,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [pdfBase64]);
+  }, [pdfBase64, pdfUrl]);
 
   // Helper to render a specific page on a canvas safely
   const renderPageToCanvas = useCallback(
@@ -961,14 +971,28 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     setIsSharing(true);
     setShareError(null);
     try {
-      const response = await fetch("/api/catalogs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, fileSize: Math.round((pdfBase64.length * 3) / 4), pdfBase64 }),
+      if (!pdfBase64) throw new Error("Энэ каталогийг дахин хуваалцах боломжгүй байна.");
+
+      const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+      const binaryString = atob(cleanBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+      const pdfBlob = new Blob([bytes], { type: "application/pdf" });
+
+      const catalogId = crypto.randomUUID();
+      const blob = await upload(`catalogs/${catalogId}.pdf`, pdfBlob, {
+        access: "public",
+        handleUploadUrl: "/api/blob-upload",
+        contentType: "application/pdf",
+        multipart: true,
+        onUploadProgress: (event) => {
+          if (event.percentage >= 0) setShareCopied(false);
+        },
       });
-      const data = await response.json();
-      if (!response.ok || !data?.id) throw new Error(data?.error || "Хуваалцах холбоос үүсгэж чадсангүй.");
-      const shareUrl = new URL(`/share/${data.id}`, window.location.origin).toString();
+
+      if (!blob?.url) throw new Error("Каталог хадгалах үед алдаа гарлаа.");
+
+      const shareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
       await navigator.clipboard.writeText(shareUrl);
       setShareCopied(true);
       window.setTimeout(() => setShareCopied(false), 2200);

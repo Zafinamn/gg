@@ -37,33 +37,24 @@ export default function App() {
     setUploadProgress(35);
 
     let cancelled = false;
-    let sharedBlobUrl = "";
 
     const loadSharedCatalog = async () => {
       try {
-        const response = await fetch(`/api/catalogs/${encodeURIComponent(catalogId)}`);
+        const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`);
         const data = await response.json();
-        if (!response.ok || !data?.pdfBase64) {
+        if (!response.ok || !data?.url) {
           throw new Error(data?.error || "Каталогийн холбоос олдсонгүй.");
         }
 
-        const cleanBase64 = String(data.pdfBase64).replace(/^data:application\/pdf;base64,/, "").trim();
-        const binary = atob(cleanBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        sharedBlobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-
-        if (cancelled) {
-          URL.revokeObjectURL(sharedBlobUrl);
-          return;
-        }
+        if (cancelled) return;
 
         setCurrentDoc({
           id: data.id || catalogId,
           name: data.filename || "G&G Catalog.pdf",
-          size: data.fileSize || Math.round(cleanBase64.length * 0.75),
-          base64: `data:application/pdf;base64,${cleanBase64}`,
-          blobUrl: sharedBlobUrl,
+          size: data.fileSize || 0,
+          base64: "",
+          blobUrl: "",
+          pdfUrl: data.url,
         });
         setUploadProgress(100);
       } catch (error: any) {
@@ -77,7 +68,6 @@ export default function App() {
     loadSharedCatalog();
     return () => {
       cancelled = true;
-      if (sharedBlobUrl) URL.revokeObjectURL(sharedBlobUrl);
     };
   }, []);
 
@@ -160,7 +150,7 @@ export default function App() {
               className="flex h-[calc(100vh-65px)] w-full flex-col p-2 sm:p-4"
             >
               <div className="flex h-full w-full flex-col">
-                <VirtualCatalogViewer pdfBase64={currentDoc.base64} filename={currentDoc.name} isSharedView={isSharedView} />
+                <VirtualCatalogViewer pdfBase64={currentDoc.base64} pdfUrl={currentDoc.pdfUrl} filename={currentDoc.name} isSharedView={isSharedView} />
               </div>
             </motion.div>
           )}

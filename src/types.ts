@@ -25,6 +25,7 @@ export interface UploadedDocument {
   size: number;
   base64: string;
   blobUrl: string;
+  pdfUrl?: string;
   analysis?: DocumentAnalysis;
   totalPages?: number;
 }
