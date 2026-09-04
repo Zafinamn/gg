@@ -965,6 +965,52 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   };
 
   // Spread calculation for labels
+  const copyTextToClipboard = async (text: string) => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // Fall through to the legacy browser fallback below.
+      }
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      textarea.style.pointerEvents = "none";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  };
+
+  const showShareCopied = () => {
+    setShareError(null);
+    setShareCopied(true);
+    window.setTimeout(() => setShareCopied(false), 2200);
+  };
+
+  const handleCopyCurrentShareLink = async () => {
+    const shareUrl = window.location.href;
+    const copied = await copyTextToClipboard(shareUrl);
+
+    if (copied) {
+      showShareCopied();
+    } else {
+      setShareError("Холбоосыг clipboard-д хуулж чадсангүй. Browser-ийн clipboard permission-ийг шалгана уу.");
+    }
+  };
+
+
   const handleShareCatalog = async () => {
     if (isSharing) return;
     setIsSharing(true);
@@ -1017,24 +1063,16 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       }
 
       const shareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
-      await navigator.clipboard.writeText(shareUrl);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 2200);
+      const copied = await copyTextToClipboard(shareUrl);
+      if (!copied) {
+        throw new Error("Холбоосыг clipboard-д хуулж чадсангүй. Browser-ийн clipboard permission-ийг шалгана уу.");
+      }
+      showShareCopied();
     } catch (error: any) {
       console.error("Share catalog error:", error);
       setShareError(error?.message || "Хуваалцах холбоос үүсгэж чадсангүй.");
     } finally {
       setIsSharing(false);
-    }
-  };
-
-  const handleCopyCurrentShareLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 2200);
-    } catch {
-      setShareError("Холбоосыг автоматаар хуулж чадсангүй.");
     }
   };
 
