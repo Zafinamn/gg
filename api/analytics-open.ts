@@ -1,59 +1,32 @@
 import { put } from '@vercel/blob';
-import crypto from 'node:crypto';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-function clean(value: string | null, max = 120) {
-  if (!value) return undefined;
-  return value.slice(0, max);
-}
-
-export default async function handler(request: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
-    if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
-
-    const body = await request.json().catch(() => ({}));
-    const catalogId = clean(body?.catalogId, 100);
-    const filename = clean(body?.filename, 180) || 'G&G Catalog.pdf';
-    if (!catalogId) return Response.json({ error: 'Missing catalogId' }, { status: 400 });
-
-    const country = clean(request.headers.get('x-vercel-ip-country'), 8);
-    const countryRegion = clean(request.headers.get('x-vercel-ip-country-region'), 32);
-    const city = clean(request.headers.get('x-vercel-ip-city'), 120);
-    const continent = clean(request.headers.get('x-vercel-ip-continent'), 8);
-    const timezone = clean(request.headers.get('x-vercel-ip-timezone'), 80);
-    const latRaw = request.headers.get('x-vercel-ip-latitude');
-    const lngRaw = request.headers.get('x-vercel-ip-longitude');
-    const lat = latRaw ? Number(latRaw) : undefined;
-    const lng = lngRaw ? Number(lngRaw) : undefined;
-    const userAgent = clean(request.headers.get('user-agent'), 240);
-
-    const event = {
-      version: 1,
-      type: 'catalog_open',
-      eventId: crypto.randomBytes(12).toString('hex'),
-      catalogId,
-      filename,
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const payload = {
+      catalogId: String(body.catalogId || ''),
+      filename: String(body.filename || 'G&G Catalog.pdf'),
       timestamp: new Date().toISOString(),
-      country,
-      countryRegion,
-      city,
-      continent,
-      timezone,
-      latitude: Number.isFinite(lat) ? Number(lat.toFixed(4)) : undefined,
-      longitude: Number.isFinite(lng) ? Number(lng.toFixed(4)) : undefined,
-      device: /mobile|android|iphone|ipad/i.test(userAgent || '') ? 'mobile' : /tablet/i.test(userAgent || '') ? 'tablet' : 'desktop',
+      country: String(req.headers['x-vercel-ip-country'] || ''),
+      countryRegion: String(req.headers['x-vercel-ip-country-region'] || ''),
+      city: String(req.headers['x-vercel-ip-city'] || ''),
+      latitude: req.headers['x-vercel-ip-latitude'] ? Number(req.headers['x-vercel-ip-latitude']) : null,
+      longitude: req.headers['x-vercel-ip-longitude'] ? Number(req.headers['x-vercel-ip-longitude']) : null,
     };
-
-    await put(`analytics/${catalogId}/${event.eventId}.json`, JSON.stringify(event), {
+    if (!payload.catalogId) return res.status(400).json({ error: 'catalogId is required' });
+    await put(`analytics/${cryptoRandomId()}.json`, JSON.stringify(payload), {
       access: 'public',
       contentType: 'application/json',
-      addRandomSuffix: false,
-      cacheControlMaxAge: 31536000,
     });
-
-    return Response.json({ ok: true });
+    return res.status(200).json({ ok: true });
   } catch (error: any) {
     console.error('Analytics open error:', error);
-    // Analytics must never break the shared catalog viewer.
-    return Response.json({ ok: false }, { status: 200 });
+    return res.status(500).json({ error: error?.message || 'Analytics event failed' });
   }
+}
+
+function cryptoRandomId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }

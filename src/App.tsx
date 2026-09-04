@@ -132,7 +132,7 @@ export default function App() {
     setErrorMessage(null);
   };
 
-  if (typeof window !== "undefined" && window.location.pathname === "/admin") {
+  if (typeof window !== "undefined" && window.location.pathname === "/admin" || window.location.pathname === "/admin/") {
     return <AdminDashboard />;
   }
 
