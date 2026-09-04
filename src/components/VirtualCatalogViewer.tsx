@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { upload } from "@vercel/blob/client";
 import * as pdfjsLib from "pdfjs-dist";
 import {
   ChevronLeft,
@@ -1046,15 +1045,37 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
       const catalogId = crypto.randomUUID();
       const pathname = `catalogs/${catalogId}.pdf`;
-      // Use one Vercel Blob client-upload path for every PDF size.
-      // The server endpoint now adapts Vercel's Node.js req/res runtime to
-      // the Web Request shape expected by @vercel/blob/client.
-      const blob = await Promise.race([
-        upload(pathname, pdfBlob, {
-          access: "public",
-          handleUploadUrl: "/api/blob-upload",
-          multipart: true,
-          contentType: "application/pdf",
+
+      // Get a short-lived signed PUT URL from a Vercel Function authenticated
+      // with the connected Blob store's OIDC credentials. The browser then
+      // uploads the PDF directly to Blob, so the PDF never passes through
+      // the Vercel Function request body limit.
+      const presignResponse = await Promise.race([
+        fetch("/api/blob-upload", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ pathname }),
+        }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(
+            () => reject(new Error("Upload холбоос үүсгэхэд хугацаа хэтэрлээ. Интернэтээ шалгаад дахин оролдоно уу.")),
+            30000,
+          ),
+        ),
+      ]);
+
+      const presignData = await presignResponse.json().catch(() => ({}));
+      if (!presignResponse.ok || !presignData?.presignedUrl) {
+        throw new Error(presignData?.error || "Vercel Blob upload холбоос үүссэнгүй.");
+      }
+
+      const uploadResponse = await Promise.race([
+        fetch(presignData.presignedUrl, {
+          method: "PUT",
+          headers: {
+            "content-type": "application/pdf",
+          },
+          body: pdfBlob,
         }),
         new Promise<never>((_, reject) =>
           window.setTimeout(
@@ -1064,7 +1085,10 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         ),
       ]);
 
-      if (!blob?.url) throw new Error("Share холбоос үүссэнгүй.");
+      if (!uploadResponse.ok) {
+        const uploadError = await uploadResponse.text().catch(() => "");
+        throw new Error(uploadError || "PDF-г Blob хадгалалт руу оруулахад алдаа гарлаа.");
+      }
 
       const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
       setShareUrl(newShareUrl);

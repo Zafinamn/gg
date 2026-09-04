@@ -1,8 +1,11 @@
-import { handleUpload } from "@vercel/blob/client";
+import { issueSignedToken, presignUrl } from "@vercel/blob";
 
 function validCatalogPath(pathname: string): boolean {
   return /^catalogs\/[a-f0-9-]{20,64}\.pdf$/i.test(pathname);
 }
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const TOKEN_TTL_MS = 15 * 60 * 1000;
 
 export default async function handler(req: any, res: any) {
   try {
@@ -10,49 +13,44 @@ export default async function handler(req: any, res: any) {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    // Vercel's /api/*.ts Node.js runtime passes an IncomingMessage here,
-    // not the Web Request object. The previous implementation called
-    // request.json(), which caused: "request.json is not a function".
-    // Convert the incoming request to a Web Request for @vercel/blob/client.
-    const body = typeof req.body === "string"
-      ? req.body
-      : JSON.stringify(req.body ?? {});
-
-    const headers = new Headers();
-    for (const [key, value] of Object.entries(req.headers || {})) {
-      if (Array.isArray(value)) headers.set(key, value.join(","));
-      else if (value != null) headers.set(key, String(value));
+    const pathname = String(req.body?.pathname || "");
+    if (!validCatalogPath(pathname)) {
+      return res.status(400).json({ error: "Буруу каталогийн зам." });
     }
 
-    const webRequest = new Request(
-      `https://${req.headers?.host || "localhost"}${req.url || "/api/blob-upload"}`,
-      { method: "POST", headers, body },
-    );
+    // IMPORTANT: do not use @vercel/blob/client here.
+    // The project has a connected Blob store with OIDC + BLOB_STORE_ID,
+    // but no BLOB_READ_WRITE_TOKEN. The signed-URL flow is designed to
+    // work with OIDC and lets the browser upload directly to Blob.
+    const validUntil = Date.now() + TOKEN_TTL_MS;
 
-    const response = await handleUpload({
-      body,
-      request: webRequest,
-      onBeforeGenerateToken: async (pathname: string) => {
-        if (!validCatalogPath(pathname)) {
-          throw new Error("Invalid catalog path.");
-        }
-
-        return {
-          allowedContentTypes: ["application/pdf"],
-          maximumSizeInBytes: 100 * 1024 * 1024,
-          addRandomSuffix: false,
-          tokenPayload: JSON.stringify({ purpose: "catalog-share" }),
-        };
-      },
-      onUploadCompleted: async ({ blob }: any) => {
-        console.info("Catalog upload completed:", blob?.pathname || "unknown");
-      },
+    const signedToken = await issueSignedToken({
+      pathname,
+      operations: ["put"],
+      validUntil,
+      maximumSizeInBytes: MAX_FILE_SIZE,
+      allowedContentTypes: ["application/pdf"],
+      storeId: process.env.BLOB_STORE_ID,
     });
 
-    return res.status(200).json(response);
+    const { presignedUrl } = await presignUrl(signedToken, {
+      pathname,
+      operation: "put",
+      validUntil,
+      maximumSizeInBytes: MAX_FILE_SIZE,
+      allowedContentTypes: ["application/pdf"],
+      access: "public",
+    });
+
+    return res.status(200).json({
+      pathname,
+      presignedUrl,
+      expiresAt: validUntil,
+    });
   } catch (error: any) {
-    console.error("Blob upload endpoint error:", error);
-    const message = error?.message || "Blob upload тохиргоонд алдаа гарлаа.";
+    console.error("Blob presign endpoint error:", error);
+
+    const message = error?.message || "Vercel Blob upload URL үүсгэж чадсангүй.";
     return res.status(500).json({ error: message });
   }
 }
