@@ -9,6 +9,7 @@ import { Header } from "./components/Header";
 import { UploadZone } from "./components/UploadZone";
 import { VirtualCatalogViewer } from "./components/VirtualCatalogViewer";
 import { UploadedDocument } from "./types";
+import { AdminDashboard } from "./components/AdminDashboard";
 
 export default function App() {
   const [currentDoc, setCurrentDoc] = useState<UploadedDocument | null>(null);
@@ -78,6 +79,12 @@ export default function App() {
           pdfUrl: data.url,
         });
         setUploadProgress(100);
+        fetch("/api/analytics-open", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ catalogId: data.id || catalogId, filename: data.filename || "G&G Catalog.pdf" }),
+          keepalive: true,
+        }).catch(() => {});
       } catch (error: any) {
         if (cancelled) return;
         console.error("Failed to load shared catalog:", error);
@@ -124,6 +131,10 @@ export default function App() {
     setUploadProgress(0);
     setErrorMessage(null);
   };
+
+  if (typeof window !== "undefined" && window.location.pathname === "/admin") {
+    return <AdminDashboard />;
+  }
 
   return (
     <div
