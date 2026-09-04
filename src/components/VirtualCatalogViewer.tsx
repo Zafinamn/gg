@@ -380,17 +380,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           },
         });
       } else if (isBackCoverView) {
-        // On back cover: loop back to front cover (Page 1)
-        setIsFlipping(true);
-        animate(coverRotateY, -180, {
-          duration: 0.52,
-          ease: [0.16, 1, 0.3, 1],
-          onComplete: () => {
-            coverRotateY.set(0);
-            setIsFlipping(false);
-            setCurrentPage(1);
-          },
-        });
+        // Already at the real last page: do not loop back to the beginning.
+        return;
       } else {
         const leftPageNum = currentPage % 2 === 0 ? currentPage : currentPage - 1;
         const nextLeft = leftPageNum + 2;
@@ -407,17 +398,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             },
           });
         } else {
-          // Reached the end of the catalog: flip to back cover or loop to front
-          setIsFlipping(true);
-          animate(rightRotateY, -180, {
-            duration: 0.36,
-            ease: [0.22, 1, 0.36, 1],
-            onComplete: () => {
-              rightRotateY.set(0);
-              setIsFlipping(false);
-              setCurrentPage(1);
-            },
-          });
+          // No real page remains. Do not create or turn to a fake page.
+          return;
         }
       }
     } else {
@@ -434,17 +416,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           },
         });
       } else {
-        // Loop back to Page 1
-        setIsFlipping(true);
-        animate(singleRotateY, -180, {
-          duration: 0.48,
-          ease: [0.16, 1, 0.3, 1],
-          onComplete: () => {
-            singleRotateY.set(0);
-            setIsFlipping(false);
-            setCurrentPage(1);
-          },
-        });
+        // Already at the last page: do not turn past the real document.
+        return;
       }
     }
   };
@@ -583,6 +556,21 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   ) => {
     if (isLoupeActive || isFlipping) return;
     if (e.button !== 0) return; // primary mouse button or touch only
+
+    // Never start a page drag when there is no real page in that direction.
+    if (side === "single") {
+      if (e.clientX < (e.currentTarget as HTMLElement).getBoundingClientRect().left + (e.currentTarget as HTMLElement).getBoundingClientRect().width / 2 && currentPage <= 1) return;
+      if (e.clientX >= (e.currentTarget as HTMLElement).getBoundingClientRect().left + (e.currentTarget as HTMLElement).getBoundingClientRect().width / 2 && currentPage >= totalPages) return;
+    } else if (side === "right" || side === "cover") {
+      if (side === "right") {
+        const leftPage = currentPage % 2 === 0 ? currentPage : currentPage - 1;
+        if (leftPage + 2 > totalPages) return;
+      }
+    } else if (side === "left" || side === "backcover") {
+      if (side === "left" && currentPage <= 2) return;
+      if (side === "backcover" && currentPage <= 1) return;
+    }
+
     setShowSwipeHint(false);
 
     const target = e.currentTarget as HTMLElement;
@@ -746,8 +734,6 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             const nextLeft = leftPageNum + 2;
             if (nextLeft <= totalPages) {
               setCurrentPage(nextLeft);
-            } else {
-              setCurrentPage(1);
             }
           } else if (side === "left") {
             if (currentPage <= 2) {
@@ -760,7 +746,6 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           } else if (side === "single") {
             if (currentAngle < 0) {
               if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-              else setCurrentPage(1);
             } else {
               if (currentPage > 1) setCurrentPage(currentPage - 1);
             }
@@ -827,13 +812,13 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       if (spreadMode === "double") {
         const currentLeft = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
         if (currentLeft + 2 > totalPages) {
-          turnToPage(1, "next"); // loop to cover
+          setIsAutoPlay(false);
         } else {
           handleNext();
         }
       } else {
         if (currentPage >= totalPages) {
-          turnToPage(1, "next");
+          setIsAutoPlay(false);
         } else {
           handleNext();
         }
@@ -1137,7 +1122,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     : isBackCover
     ? `Арын нүүр ${totalPages}`
     : spreadMode === "double"
-    ? `Хуудас ${leftPageNumber} – ${Math.min(rightPageNumber, totalPages)} of ${totalPages}`
+    ? `Хуудас ${leftPageNumber} – ${Math.min(rightPageNumber, totalPages)} / ${totalPages}`
     : `Хуудас ${currentPage} / ${totalPages}`;
 
   return (
@@ -1536,12 +1521,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           3
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-center p-6 text-slate-400 h-full flex flex-col items-center justify-center">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-500/80">Каталогийн агуулга</p>
-                        <p className="text-sm font-semibold text-slate-600 mt-1">Spread Pages 2 & 3</p>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Physical 3D Cover Leaf - Turns when dragged */}
@@ -1598,11 +1578,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                         <div className="absolute bottom-0 right-0 w-10 h-10 group-hover/peel:w-14 group-hover/peel:h-14 bg-black/25 blur-xs -z-10 transition-all duration-200 pointer-events-none" />
                       </div>
 
-                      {/* Open Prompt Badge */}
-                      <div className="absolute bottom-6 right-6 px-4 py-2 rounded-full bg-slate-950/80 backdrop-blur-md text-white font-semibold text-xs border border-white/20 flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg pointer-events-none">
-                        <span>Каталог нээх</span>
-                        <ChevronRight className="w-4 h-4 text-indigo-400 animate-pulse" />
-                      </div>
+                      {/* No artificial prompt; page itself is the interaction surface. */}
                     </motion.div>
 
                     {/* Back Face: Inside Cover (Visible when turned past 90 degrees) */}
@@ -1624,11 +1600,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                             2
                           </div>
                         </div>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center p-6 text-slate-400 pointer-events-none">
-                          <span className="text-xs uppercase tracking-widest font-bold text-slate-400">Inside Cover</span>
-                        </div>
-                      )}
+                      ) : null}
                     </motion.div>
                   </motion.div>
                 </div>
@@ -1652,11 +1624,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           {totalPages - 1}
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-center p-6 text-slate-400 h-full flex flex-col items-center justify-center">
-                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Physical 3D Back Cover Leaf - Turns when dragged */}
@@ -1713,15 +1681,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                         <div className="absolute bottom-0 left-0 w-10 h-10 group-hover/peel:w-14 group-hover/peel:h-14 bg-black/25 blur-xs -z-10 transition-all duration-200 pointer-events-none" />
                       </div>
 
-                      {/* Return Badge */}
-                      <div className="absolute bottom-6 left-6 px-4 py-2 rounded-full bg-slate-950/80 backdrop-blur-md text-white font-semibold text-xs border border-white/20 flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg pointer-events-none">
-                        <ChevronLeft className="w-4 h-4 text-indigo-400" />
-                        <span>Back Cover · Turn to Open</span>
-                      </div>
-
-                      <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-sm text-slate-300 font-semibold text-[11px] border border-white/10 pointer-events-none">
-                        Каталогийн төгсгөл (Page {totalPages})
-                      </div>
+                      {/* No artificial end-of-catalog overlay. The final real PDF page stays the end. */}
                     </motion.div>
 
                     {/* Inside Face: Inside Back Cover (Revealed when turned > 90 deg) */}
@@ -1743,11 +1703,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                             {totalPages - 1}
                           </div>
                         </div>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center p-6 text-slate-400 pointer-events-none">
-                          <span className="text-xs uppercase tracking-widest font-bold text-slate-400">Inside Back Cover</span>
-                        </div>
-                      )}
+                      ) : null}
                     </motion.div>
                   </motion.div>
                 </div>
@@ -1777,11 +1733,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           {leftPageNumber - 2}
                         </div>
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                        <span className="text-xs uppercase tracking-widest font-semibold">Inside Front Cover</span>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Stationary Right Backing Sheet (Stationary background underneath right page) */}
@@ -1798,11 +1750,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           {rightPageNumber + 2}
                         </div>
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
-                      </div>
-                    )}
+) : null}
                   </div>
 
                   {/* Physical Left Page Sheet (Turns backward around center spine) */}
@@ -1925,17 +1873,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                     >
                       {rightPageNumber <= totalPages ? (
                         <canvas ref={rightCanvasRef} className="block max-w-full" />
-                      ) : (
-                        <div className="w-full h-full min-h-[380px] flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 p-8 text-center">
-                          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-sm">
-                            <BookOpen className="w-7 h-7" />
-                          </div>
-                          <span className="text-xs uppercase tracking-widest font-bold text-indigo-600">Каталогийн төгсгөл</span>
-                          <p className="text-xs text-slate-500 mt-2 max-w-[200px]">
-                            Drag or click to flip back to cover
-                          </p>
-                        </div>
-                      )}
+ ) : null}
 
                       {/* Spine Seam Shadow (Left Edge of Right Page) */}
                       <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black/20 via-black/05 to-transparent pointer-events-none" />
@@ -2054,11 +1992,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                         Page {currentPage + 1} of {totalPages}
                       </div>
                     </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                      <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
-                    </div>
-                  )}
+) : null}
                 </div>
 
                 {/* Active turning leaf */}
@@ -2131,11 +2065,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           Page {currentPage + 1} of {totalPages}
                         </div>
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
-                      </div>
-                    )}
+) : null}
                   </motion.div>
                 </motion.div>
               </div>
