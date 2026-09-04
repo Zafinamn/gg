@@ -1046,39 +1046,20 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
       const catalogId = crypto.randomUUID();
       const pathname = `catalogs/${catalogId}.pdf`;
-      const MAX_SERVER_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-      // Small PDFs go through our server Blob upload route. This avoids the
-      // client-token/presigned handshake entirely and works reliably for
-      // connected Vercel Blob stores using OIDC.
-      // Larger PDFs use Vercel Blob's direct client multipart upload so they
-      // do not cross Vercel's 4.5 MB function payload limit.
+      // Use one Vercel Blob client-upload path for every PDF size.
+      // The server endpoint now adapts Vercel's Node.js req/res runtime to
+      // the Web Request shape expected by @vercel/blob/client.
       const blob = await Promise.race([
-        (pdfBlob.size <= MAX_SERVER_UPLOAD_BYTES
-          ? (async () => {
-              const form = new FormData();
-              form.append("file", pdfBlob, `${catalogId}.pdf`);
-              form.append("catalogId", catalogId);
-              const response = await fetch("/api/catalog-upload", {
-                method: "POST",
-                body: form,
-              });
-              const data = await response.json().catch(() => ({}));
-              if (!response.ok || !data?.url) {
-                throw new Error(data?.error || "PDF-г хадгалж чадсангүй.");
-              }
-              return data;
-            })()
-          : upload(pathname, pdfBlob, {
-              access: "public",
-              handleUploadUrl: "/api/blob-upload",
-              multipart: true,
-              contentType: "application/pdf",
-            })),
+        upload(pathname, pdfBlob, {
+          access: "public",
+          handleUploadUrl: "/api/blob-upload",
+          multipart: true,
+          contentType: "application/pdf",
+        }),
         new Promise<never>((_, reject) =>
           window.setTimeout(
             () => reject(new Error("PDF-г хадгалахад хугацаа хэтэрлээ. Интернэтээ шалгаад дахин оролдоно уу.")),
-            120000,
+            180000,
           ),
         ),
       ]);
