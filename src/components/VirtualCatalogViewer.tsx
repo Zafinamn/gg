@@ -1046,17 +1046,40 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
       const catalogId = crypto.randomUUID();
       const pathname = `catalogs/${catalogId}.pdf`;
-      const useMultipart = pdfBlob.size > 4 * 1024 * 1024;
+      const MAX_SERVER_UPLOAD_BYTES = 4 * 1024 * 1024;
 
+      // Small PDFs go through our server Blob upload route. This avoids the
+      // client-token/presigned handshake entirely and works reliably for
+      // connected Vercel Blob stores using OIDC.
+      // Larger PDFs use Vercel Blob's direct client multipart upload so they
+      // do not cross Vercel's 4.5 MB function payload limit.
       const blob = await Promise.race([
-        upload(pathname, pdfBlob, {
-          access: "public",
-          handleUploadUrl: "/api/blob-upload",
-          multipart: useMultipart,
-          contentType: "application/pdf",
-        }),
+        (pdfBlob.size <= MAX_SERVER_UPLOAD_BYTES
+          ? (async () => {
+              const form = new FormData();
+              form.append("file", pdfBlob, `${catalogId}.pdf`);
+              form.append("catalogId", catalogId);
+              const response = await fetch("/api/catalog-upload", {
+                method: "POST",
+                body: form,
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data?.url) {
+                throw new Error(data?.error || "PDF-г хадгалж чадсангүй.");
+              }
+              return data;
+            })()
+          : upload(pathname, pdfBlob, {
+              access: "public",
+              handleUploadUrl: "/api/blob-upload",
+              multipart: true,
+              contentType: "application/pdf",
+            })),
         new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error("PDF-г хадгалахад хугацаа хэтэрлээ. Интернэтээ шалгаад дахин оролдоно уу.")), 120000),
+          window.setTimeout(
+            () => reject(new Error("PDF-г хадгалахад хугацаа хэтэрлээ. Интернэтээ шалгаад дахин оролдоно уу.")),
+            120000,
+          ),
         ),
       ]);
 
