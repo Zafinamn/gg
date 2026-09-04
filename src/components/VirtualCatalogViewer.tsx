@@ -80,6 +80,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   const [isSharing, setIsSharing] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Viewing Modes
   const [spreadMode, setSpreadMode] = useState<SpreadViewMode>("double");
@@ -964,58 +966,53 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     }
   };
 
-  // Reliable URL copy for Chrome/Vercel deployments.
-  // Keep the actual copy call inside the button click flow and use a real
-  // visible-to-selection textarea for the legacy path.
-  const copyTextToClipboard = async (text: string) => {
-    // Preferred: Clipboard API with a plain-text ClipboardItem.
-    if (window.isSecureContext && navigator.clipboard) {
-      try {
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
-          const item = new ClipboardItem({
-            "text/plain": new Blob([text], { type: "text/plain" }),
-          });
-          await navigator.clipboard.write([item]);
-        } else if (navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          throw new Error("Clipboard API unavailable");
-        }
-        return true;
-      } catch (error) {
-        console.warn("Clipboard API failed, trying selection fallback:", error);
-      }
-    }
-
-    // Fallback: select an actual textarea and issue copy synchronously.
+  // Copy during a direct user click. For the initial Share action, the PDF upload
+  // is asynchronous, so we show the generated URL and let the user press the
+  // explicit Copy button; this preserves browser user-gesture clipboard rules.
+  const copyTextSynchronously = (text: string): boolean => {
     try {
       const textarea = document.createElement("textarea");
       textarea.value = text;
       textarea.readOnly = true;
       textarea.setAttribute("aria-hidden", "true");
       textarea.style.position = "fixed";
-      textarea.style.left = "8px";
-      textarea.style.top = "8px";
-      textarea.style.width = "calc(100vw - 16px)";
-      textarea.style.height = "24px";
-      textarea.style.opacity = "0.01";
-      textarea.style.pointerEvents = "none";
-      textarea.style.zIndex = "2147483647";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+      textarea.style.width = "1px";
+      textarea.style.height = "1px";
+      textarea.style.opacity = "0";
       document.body.appendChild(textarea);
-
       textarea.focus({ preventScroll: true });
       textarea.select();
       textarea.setSelectionRange(0, text.length);
       const copied = document.execCommand("copy");
-      textarea.blur();
       textarea.remove();
       return copied;
-    } catch (error) {
-      console.warn("Selection clipboard fallback failed:", error);
+    } catch {
       return false;
     }
   };
 
+  const copyShareUrlNow = (url: string) => {
+    // Use the synchronous browser copy command first because it runs directly
+    // inside the user's click event and does not lose the user activation.
+    if (copyTextSynchronously(url)) {
+      showShareCopied();
+      return;
+    }
+
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => showShareCopied())
+        .catch(() => {
+          setShareError("Холбоосыг clipboard-д хуулж чадсангүй. Доорх холбоосыг гараар хуулна уу.");
+        });
+      return;
+    }
+
+    setShareError("Холбоосыг clipboard-д хуулж чадсангүй. Доорх холбоосыг гараар хуулна уу.");
+  };
 
   const showShareCopied = () => {
     setShareError(null);
@@ -1023,22 +1020,21 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     window.setTimeout(() => setShareCopied(false), 2200);
   };
 
-  const handleCopyCurrentShareLink = async () => {
-    const shareUrl = window.location.href;
-    const copied = await copyTextToClipboard(shareUrl);
-
-    if (copied) {
-      showShareCopied();
-    } else {
-      setShareError("Холбоосыг clipboard-д хуулж чадсангүй. Browser-ийн clipboard permission-ийг шалгана уу.");
-    }
+  const handleCopyCurrentShareLink = () => {
+    const currentUrl = window.location.href;
+    copyShareUrlNow(currentUrl);
   };
 
+  const handleCopyGeneratedShareUrl = () => {
+    if (!shareUrl) return;
+    copyShareUrlNow(shareUrl);
+  };
 
   const handleShareCatalog = async () => {
     if (isSharing) return;
     setIsSharing(true);
     setShareError(null);
+    setShareCopied(false);
     try {
       if (!pdfBase64) throw new Error("Энэ каталогийг дахин хуваалцах боломжгүй байна.");
 
@@ -1086,12 +1082,9 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         throw new Error(uploadError);
       }
 
-      const shareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
-      const copied = await copyTextToClipboard(shareUrl);
-      if (!copied) {
-        throw new Error("Холбоосыг clipboard-д хуулж чадсангүй. Browser-ийн clipboard permission-ийг шалгана уу.");
-      }
-      showShareCopied();
+      const newShareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
+      setShareUrl(newShareUrl);
+      setShowShareModal(true);
     } catch (error: any) {
       console.error("Share catalog error:", error);
       setShareError(error?.message || "Хуваалцах холбоос үүсгэж чадсангүй.");
@@ -1290,7 +1283,59 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                 : "border-emerald-400/20 bg-emerald-950/90 text-emerald-200"
             }`}
           >
-            {shareError || "Холбоос бэлэн — clipboard-д хууллаа."}
+            {isSharing ? "Холбоос үүсгэж байна…" : shareError || "Холбоос clipboard-д хууллаа."}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showShareModal && shareUrl && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setShowShareModal(false);
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              className="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl"
+            >
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Каталогийн холбоос</h3>
+                  <p className="mt-1 text-sm text-slate-400">Холбоос бэлэн боллоо. Copy дээр дарж clipboard-д хуулна уу.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                  aria-label="Хаах"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  value={shareUrl}
+                  readOnly
+                  onFocus={(event) => event.currentTarget.select()}
+                  className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyGeneratedShareUrl}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500"
+                >
+                  {shareCopied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                  {shareCopied ? "Хуулсан" : "Хуулах"}
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
