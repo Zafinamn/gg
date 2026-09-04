@@ -1,6 +1,3 @@
 # G&G International PDF Catalog
 
-V34: Admin route/API compatibility fix. The main catalog viewer, Share links, Blob storage, mobile interactions, page turning, zoom, loupe, search, bookmarks, fullscreen, dark/light mode, and original G&G logo are preserved.
-
-## Admin
-Open `/admin` and sign in with `ADMIN_PASSWORD` configured in Vercel Environment Variables.
+V37: Admin дээр холбоос бүрийг нэрээр нь тусдаа slug URL болгон үүсгэдэг. Жишээ: `5-р дэлгүүр` → `/share/5-r-delguur`.

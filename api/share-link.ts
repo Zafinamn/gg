@@ -16,9 +16,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Буруу каталогийн холбоос.' });
     }
 
-    const recordPath = `share-links/${id}.json`;
-    const recordResult = await list({ prefix: recordPath, limit: 20 });
-    const recordBlob = recordResult.blobs.find((b: any) => b.pathname === recordPath) as any;
+    const namedPath = `share-links/named/${id}.json`;
+    const namedResult = await list({ prefix: namedPath, limit: 20 });
+    let recordBlob = namedResult.blobs.find((b: any) => b.pathname === namedPath) as any;
+
+    // Backward compatibility: old links used the random linkId as the filename.
+    if (!recordBlob?.url) {
+      const legacyPath = `share-links/${id}.json`;
+      const legacyResult = await list({ prefix: legacyPath, limit: 20 });
+      recordBlob = legacyResult.blobs.find((b: any) => b.pathname === legacyPath) as any;
+    }
+
     if (!recordBlob?.url) {
       return res.status(404).json({ error: 'Каталогийн холбоос олдсонгүй.' });
     }

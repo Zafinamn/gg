@@ -21,6 +21,14 @@ function auth(req: VercelRequest) {
 }
 const clean = (v: any, m = 160) => String(v ?? '').trim().slice(0, m);
 
+function makeSlug(value: string) {
+  const map: Record<string, string> = {
+    'А':'A','а':'a','Б':'B','б':'b','В':'V','в':'v','Г':'G','г':'g','Д':'D','д':'d','Е':'E','е':'e','Ё':'Yo','ё':'yo','Ж':'J','ж':'j','З':'Z','з':'z','И':'I','и':'i','Й':'Y','й':'y','К':'K','к':'k','Л':'L','л':'l','М':'M','м':'m','Н':'N','н':'n','О':'O','о':'o','Ө':'OE','ө':'oe','П':'P','п':'p','Р':'R','р':'r','С':'S','с':'s','Т':'T','т':'t','У':'U','у':'u','Ү':'UE','ү':'ue','Ф':'F','ф':'f','Х':'H','х':'h','Ц':'Ts','ц':'ts','Ч':'Ch','ч':'ch','Ш':'Sh','ш':'sh','Щ':'Sch','щ':'sch','Ъ':'','ъ':'','Ы':'Y','ы':'y','Ь':'','ь':'','Э':'E','э':'e','Ю':'Yu','ю':'yu','Я':'Ya','я':'ya'
+  };
+  const normalized = Array.from(value).map(ch => map[ch] ?? ch).join('');
+  return normalized.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 72) || `link-${Date.now()}`;
+}
+
 async function listAll(prefix: string) {
   const out: any[] = [];
   let cursor: string | undefined;
@@ -74,8 +82,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!catalog?.url) return res.status(404).json({ error: 'Тухайн каталог Blob дээр олдсонгүй.' });
 
     const linkId = crypto.randomBytes(9).toString('base64url');
+    const baseSlug = makeSlug(name);
+    let slug = baseSlug;
+    const existing = await list({ prefix: 'share-links/named/', limit: 1000 });
+    const existingNames = new Set(existing.blobs.map((b: any) => b.pathname.replace(/^share-links\/named\//, '').replace(/\.json$/i, '')));
+    let suffix = 2;
+    while (existingNames.has(slug)) slug = `${baseSlug}-${suffix++}`;
+
     const record = {
       linkId,
+      slug,
       catalogId,
       name,
       filename,
@@ -85,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       createdAt: new Date().toISOString(),
     };
 
-    await put(`share-links/${linkId}.json`, JSON.stringify(record), {
+    await put(`share-links/named/${slug}.json`, JSON.stringify(record), {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
@@ -93,7 +109,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     return res.status(201).json({
-      link: `/share/${linkId}`,
+      link: `/share/${slug}`,
+      slug,
       linkId,
       catalogId,
       name,
