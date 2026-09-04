@@ -50,18 +50,20 @@ export default function App() {
         let lastError: any = null;
         for (let attempt = 0; attempt < 8; attempt++) {
           try {
-            const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`, {
-              cache: "no-store",
-            });
+            const linkResponse = await fetch(`/api/share-link?id=${encodeURIComponent(catalogId)}`, { cache: "no-store" });
+            const linkJson = await linkResponse.json().catch(() => ({}));
+            if (linkResponse.ok && linkJson?.url) {
+              data = linkJson;
+              break;
+            }
+            const response = await fetch(`/api/catalog?id=${encodeURIComponent(catalogId)}`, { cache: "no-store" });
             const json = await response.json().catch(() => ({}));
             if (response.ok && json?.url) {
               data = json;
               break;
             }
-            lastError = new Error(json?.error || "Каталогийн холбоос олдсонгүй.");
-          } catch (fetchError) {
-            lastError = fetchError;
-          }
+            lastError = new Error(json?.error || linkJson?.error || "Каталогийн холбоос олдсонгүй.");
+          } catch (fetchError) { lastError = fetchError; }
           await new Promise((resolve) => window.setTimeout(resolve, 750));
         }
 
@@ -82,7 +84,7 @@ export default function App() {
         fetch("/api/analytics-open", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ catalogId: data.id || catalogId, filename: data.filename || "G&G Catalog.pdf" }),
+          body: JSON.stringify({ catalogId: data.id || catalogId, linkId: data.linkId || catalogId, linkName: data.linkName || "", filename: data.filename || "G&G Catalog.pdf" }),
           keepalive: true,
         }).catch(() => {});
       } catch (error: any) {

@@ -83,6 +83,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
     }
 
+    const linkMap = new Map<string, any>();
+    for (const event of events) {
+      const linkId = event.linkId || event.catalogId;
+      const link = linkMap.get(linkId) || {
+        id: linkId,
+        name: event.linkName || 'Үндсэн холбоос',
+        catalogId: event.catalogId,
+        filename: event.filename || 'G&G Catalog.pdf',
+        opens: 0,
+        lastOpenedAt: null,
+      };
+      link.opens += 1;
+      if (!link.lastOpenedAt || new Date(event.timestamp) > new Date(link.lastOpenedAt)) {
+        link.lastOpenedAt = event.timestamp;
+      }
+      linkMap.set(linkId, link);
+    }
+
     const topCity = [...locationMap.values()].sort((a, b) => b.opens - a.opens)[0] || null;
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
@@ -95,6 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : '—',
       },
       catalogs: [...catalogMap.values()].sort((a, b) => b.opens - a.opens),
+      links: [...linkMap.values()].sort((a, b) => b.opens - a.opens),
       locations: [...locationMap.values()].sort((a, b) => b.opens - a.opens),
       daily: [...dailyMap.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
