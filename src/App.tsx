@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Header } from "./components/Header";
 import { UploadZone } from "./components/UploadZone";
@@ -14,6 +14,15 @@ export default function App() {
   const [currentDoc, setCurrentDoc] = useState<UploadedDocument | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("pdf-ai-theme") !== "light";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("pdf-ai-theme", isDarkMode ? "dark" : "light");
+    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
+  }, [isDarkMode]);
 
   const handleFileSelected = (fileData: { base64: string; name: string; size: number }) => {
     setErrorMessage(null);
@@ -37,7 +46,7 @@ export default function App() {
     } catch (err) {
       console.error("Failed to load PDF into virtual catalog:", err);
       setUploadProgress(0);
-      setErrorMessage("Could not parse this PDF catalog. Please try another file.");
+      setErrorMessage("PDF файлыг уншиж чадсангүй. Өөр файл сонгоно уу.");
     }
   };
 
@@ -49,25 +58,49 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b17] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-      <Header currentDocument={currentDoc} onUploadNew={handleUploadNew} />
+    <div
+      className={`min-h-screen antialiased transition-colors duration-300 ${
+        isDarkMode
+          ? "bg-[#070b17] text-slate-100 selection:bg-indigo-500 selection:text-white"
+          : "bg-[#f6f8fc] text-slate-900 selection:bg-indigo-200 selection:text-slate-900"
+      }`}
+    >
+      <Header
+        currentDocument={currentDoc}
+        onUploadNew={handleUploadNew}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode((value) => !value)}
+      />
       <main className="relative min-h-[calc(100vh-65px)] overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,70,229,0.10),transparent_35%)]" />
         <AnimatePresence mode="wait">
           {!currentDoc && (
-            <motion.div key="upload-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+            <motion.div
+              key="upload-view"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
               <UploadZone
                 onFileSelected={handleFileSelected}
                 isUploading={uploadProgress > 0 && uploadProgress < 100}
                 uploadProgress={uploadProgress}
                 errorMessage={errorMessage}
                 onClearError={() => setErrorMessage(null)}
+                isDarkMode={isDarkMode}
               />
             </motion.div>
           )}
 
           {currentDoc && (
-            <motion.div key="catalog-view" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.99 }} transition={{ duration: 0.25 }} className="flex h-[calc(100vh-65px)] w-full flex-col p-2 sm:p-4">
+            <motion.div
+              key="catalog-view"
+              initial={{ opacity: 0, scale: 0.99 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.99 }}
+              transition={{ duration: 0.25 }}
+              className="flex h-[calc(100vh-65px)] w-full flex-col p-2 sm:p-4"
+            >
               <div className="flex h-full w-full flex-col">
                 <VirtualCatalogViewer pdfBase64={currentDoc.base64} filename={currentDoc.name} />
               </div>

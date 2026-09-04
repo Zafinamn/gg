@@ -341,7 +341,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         // Turning front cover open to page 2
         setIsFlipping(true);
         animate(coverRotateY, -180, {
-          duration: 0.58,
+          duration: 0.52,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             coverRotateY.set(0);
@@ -353,7 +353,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         // On back cover: loop back to front cover (Page 1)
         setIsFlipping(true);
         animate(coverRotateY, -180, {
-          duration: 0.58,
+          duration: 0.52,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             coverRotateY.set(0);
@@ -368,8 +368,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         if (nextLeft <= totalPages) {
           setIsFlipping(true);
           animate(rightRotateY, -180, {
-            duration: 0.58,
-            ease: [0.16, 1, 0.3, 1],
+            duration: 0.36,
+            ease: [0.22, 1, 0.36, 1],
             onComplete: () => {
               rightRotateY.set(0);
               setIsFlipping(false);
@@ -380,8 +380,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           // Reached the end of the catalog: flip to back cover or loop to front
           setIsFlipping(true);
           animate(rightRotateY, -180, {
-            duration: 0.58,
-            ease: [0.16, 1, 0.3, 1],
+            duration: 0.36,
+            ease: [0.22, 1, 0.36, 1],
             onComplete: () => {
               rightRotateY.set(0);
               setIsFlipping(false);
@@ -395,7 +395,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       if (currentPage < totalPages) {
         setIsFlipping(true);
         animate(singleRotateY, -180, {
-          duration: 0.52,
+          duration: 0.48,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             singleRotateY.set(0);
@@ -407,7 +407,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         // Loop back to Page 1
         setIsFlipping(true);
         animate(singleRotateY, -180, {
-          duration: 0.52,
+          duration: 0.48,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             singleRotateY.set(0);
@@ -434,7 +434,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         // On pages 2 & 3: turn back to front cover (Page 1)
         setIsFlipping(true);
         animate(leftRotateY, 180, {
-          duration: 0.58,
+          duration: 0.52,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             leftRotateY.set(0);
@@ -446,7 +446,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         // On back cover: turn back to the last open spread
         setIsFlipping(true);
         animate(coverRotateY, 180, {
-          duration: 0.58,
+          duration: 0.52,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             coverRotateY.set(0);
@@ -459,7 +459,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         const prevLeft = leftPageNum - 2;
         setIsFlipping(true);
         animate(leftRotateY, 180, {
-          duration: 0.58,
+          duration: 0.52,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             leftRotateY.set(0);
@@ -472,7 +472,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       if (currentPage > 1) {
         setIsFlipping(true);
         animate(singleRotateY, 180, {
-          duration: 0.52,
+          duration: 0.48,
           ease: [0.16, 1, 0.3, 1],
           onComplete: () => {
             singleRotateY.set(0);
@@ -499,7 +499,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     setTimeout(() => {
       setCurrentPage(newPage);
       setIsFlipping(false);
-    }, 280);
+    }, 260);
   };
 
   const handleNext = () => {
@@ -664,8 +664,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       }
 
       animate(activeMotion, targetAngle, {
-        duration: 0.24,
-        ease: [0.22, 1, 0.36, 1],
+        duration: 0.42,
+        ease: [0.16, 1, 0.3, 1],
         onComplete: () => {
           activeMotion.set(0);
           setIsPageDragging(false);
@@ -705,8 +705,8 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       });
     } else {
       animate(activeMotion, 0, {
-        duration: 0.18,
-        ease: [0.22, 1, 0.36, 1],
+        duration: 0.28,
+        ease: [0.16, 1, 0.3, 1],
         onComplete: () => {
           activeMotion.set(0);
           setIsPageDragging(false);
@@ -1717,7 +1717,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.2)",
                         }}
                         transition={{
-                          duration: 0.56,
+                          duration: 0.52,
                           ease: [0.16, 1, 0.3, 1],
                         }}
                         style={{
