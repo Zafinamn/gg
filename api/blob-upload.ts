@@ -1,33 +1,35 @@
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { handleUploadPresigned, issueSignedToken } from "@vercel/blob/client";
 
 export default async function handler(request: Request): Promise<Response> {
-  const body = (await request.json()) as HandleUploadBody;
-
   try {
-    const jsonResponse = await handleUpload({
+    const body = await request.json();
+
+    const jsonResponse = await handleUploadPresigned({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
+      webhookPublicKey: process.env.BLOB_WEBHOOK_PUBLIC_KEY,
+      getSignedToken: async (pathname, _clientPayload, _multipart) => {
         if (!/^catalogs\/[a-f0-9-]+\.pdf$/i.test(pathname)) {
-          throw new Error('Invalid catalog path.');
+          throw new Error("Invalid catalog path.");
         }
 
-        return {
-          allowedContentTypes: ['application/pdf'],
+        const token = await issueSignedToken({
+          pathname,
+          operations: ["put"],
+          allowedContentTypes: ["application/pdf"],
           maximumSizeInBytes: 100 * 1024 * 1024,
-          addRandomSuffix: false,
-        };
-      },
-      onUploadCompleted: async ({ blob }) => {
-        console.log('Catalog upload completed:', blob.pathname);
+          validUntil: Date.now() + 10 * 60 * 1000,
+        });
+
+        return { token };
       },
     });
 
     return Response.json(jsonResponse);
   } catch (error: any) {
-    console.error('Blob upload token error:', error);
+    console.error("Blob presigned upload error:", error);
     return Response.json(
-      { error: error?.message || 'Upload token үүсгэж чадсангүй.' },
+      { error: error?.message || "Upload token үүсгэж чадсангүй." },
       { status: 400 },
     );
   }

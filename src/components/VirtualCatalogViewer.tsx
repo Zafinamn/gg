@@ -34,7 +34,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "
 import { soundEffects } from "../utils/soundEffects";
 import { SpreadViewMode, CatalogBookmark } from "../types";
 import { GGLogo } from "./GGLogo";
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 
 // Configure pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -980,7 +980,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
       const catalogId = crypto.randomUUID();
-      const blob = await upload(`catalogs/${catalogId}.pdf`, pdfBlob, {
+      const blob = await uploadPresigned(`catalogs/${catalogId}.pdf`, pdfBlob, {
         access: "public",
         handleUploadUrl: "/api/blob-upload",
         contentType: "application/pdf",
@@ -1019,12 +1019,12 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   const leftPageNumber = currentPage % 2 === 0 ? currentPage : currentPage - 1;
   const rightPageNumber = leftPageNumber + 1;
   const spreadLabel = isCover
-    ? "Cover Page 1 (Front)"
+    ? "Нүүр хуудас 1"
     : isBackCover
-    ? `Back Cover Page ${totalPages}`
+    ? `Арын нүүр ${totalPages}`
     : spreadMode === "double"
-    ? `Spread: Pages ${leftPageNumber} – ${Math.min(rightPageNumber, totalPages)} of ${totalPages}`
-    : `Page ${currentPage} of ${totalPages}`;
+    ? `Хуудас ${leftPageNumber} – ${Math.min(rightPageNumber, totalPages)} of ${totalPages}`
+    : `Хуудас ${currentPage} / ${totalPages}`;
 
   return (
     <div
@@ -1042,12 +1042,12 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             <GGLogo className="w-full h-full" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 max-w-[68vw] items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent pb-0.5">
               <span className="font-bold text-slate-200 truncate max-w-[180px] sm:max-w-[280px]">
                 {filename}
               </span>
               <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-slate-800 text-cyan-400 font-semibold text-[10px] tracking-wider uppercase">
-                G&G International Catalog
+                G&G Олон улсын каталог
               </span>
             </div>
             <p className="text-[11px] text-slate-400 truncate">{spreadLabel}</p>
@@ -1066,7 +1066,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                   ? "bg-indigo-600 text-white shadow-xs"
                   : "text-slate-400 hover:text-slate-200"
               }`}
-              title="Two-Page Book Spread"
+              title="2 хуудаст харах"
             >
               2-Page Spread
             </button>
@@ -1140,7 +1140,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                 ? "bg-indigo-600 text-white border-indigo-500"
                 : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
             }`}
-            title="Search Products & Text"
+            title="Бүтээгдэхүүн болон текст хайх"
           >
             <Search className="w-4 h-4" />
           </button>
@@ -1154,7 +1154,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                 ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
                 : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
             }`}
-            title="Saved Catalog Bookmarks"
+            title="Хадгалсан хавчуурга"
           >
             <Bookmark className="w-4 h-4" />
             {bookmarks.length > 0 && (
@@ -1169,10 +1169,11 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             type="button"
             onClick={isSharedView ? handleCopyCurrentShareLink : handleShareCatalog}
             disabled={isSharing}
-            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+            aria-label={isSharedView ? "Каталогийн холбоос хуулах" : "Каталог хуваалцах холбоос үүсгэх"}
+            className={`shrink-0 p-2 rounded-xl border transition-all cursor-pointer ${
               shareCopied
                 ? "bg-emerald-600 text-white border-emerald-500"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                : "bg-indigo-600/15 border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/25 hover:text-white hover:border-indigo-400"
             } disabled:opacity-60`}
             title={isSharedView ? "Холбоос хуулах" : "Каталогийн холбоос үүсгэх"}
           >
@@ -1184,7 +1185,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             type="button"
             onClick={toggleFullscreen}
             className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors cursor-pointer"
-            title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
+            title={isFullscreen ? "Дэлгэцээс гарах (F)" : "Дэлгэц дүүрэн (F)"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -1192,7 +1193,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       </div>
 
       <AnimatePresence>
-        {(shareCopied || shareError) && (
+        {(shareCopied || shareError || isSharing) && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1337,7 +1338,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         {isLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 text-slate-400 py-16">
             <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
-            <p className="text-sm font-semibold tracking-wide">Opening G&G International Catalog...</p>
+            <p className="text-sm font-semibold tracking-wide">G&G каталоги нээгдэж байна...</p>
             <p className="text-xs text-slate-600">Generating 3D book spreads and textures</p>
           </div>
         ) : renderError ? (
@@ -1371,7 +1372,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                       </div>
                     ) : (
                       <div className="text-center p-6 text-slate-400 h-full flex flex-col items-center justify-center">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-500/80">Catalog Content</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-500/80">Каталогийн агуулга</p>
                         <p className="text-sm font-semibold text-slate-600 mt-1">Spread Pages 2 & 3</p>
                       </div>
                     )}
@@ -1433,7 +1434,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
 
                       {/* Open Prompt Badge */}
                       <div className="absolute bottom-6 right-6 px-4 py-2 rounded-full bg-slate-950/80 backdrop-blur-md text-white font-semibold text-xs border border-white/20 flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg pointer-events-none">
-                        <span>Open Catalog Spread</span>
+                        <span>Каталог нээх</span>
                         <ChevronRight className="w-4 h-4 text-indigo-400 animate-pulse" />
                       </div>
                     </motion.div>
@@ -1466,7 +1467,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                   </motion.div>
                 </div>
               ) : isBackCover ? (
-                /* Back Cover Page (End of Catalog): Physical 3D turning back cover leaf matching the front */
+                /* Арын нүүр (Каталогийн төгсгөл): Physical 3D turning back cover leaf matching the front */
                 <div
                   style={{ perspective: 1600 }}
                   className="relative flex items-center justify-center select-none"
@@ -1487,7 +1488,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                       </div>
                     ) : (
                       <div className="text-center p-6 text-slate-400 h-full flex flex-col items-center justify-center">
-                        <span className="text-xs uppercase tracking-widest font-semibold">End of Catalog</span>
+                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
                       </div>
                     )}
                   </div>
@@ -1553,7 +1554,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                       </div>
 
                       <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-slate-900/60 backdrop-blur-sm text-slate-300 font-semibold text-[11px] border border-white/10 pointer-events-none">
-                        End of Catalog (Page {totalPages})
+                        Каталогийн төгсгөл (Page {totalPages})
                       </div>
                     </motion.div>
 
@@ -1633,7 +1634,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                       </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                        <span className="text-xs uppercase tracking-widest font-semibold">End of Catalog</span>
+                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
                       </div>
                     )}
                   </div>
@@ -1763,7 +1764,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-sm">
                             <BookOpen className="w-7 h-7" />
                           </div>
-                          <span className="text-xs uppercase tracking-widest font-bold text-indigo-600">End of Catalog</span>
+                          <span className="text-xs uppercase tracking-widest font-bold text-indigo-600">Каталогийн төгсгөл</span>
                           <p className="text-xs text-slate-500 mt-2 max-w-[200px]">
                             Drag or click to flip back to cover
                           </p>
@@ -1834,7 +1835,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                           <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mb-2">
                             <RotateCcw className="w-6 h-6 text-indigo-500" />
                           </div>
-                          <span className="text-xs uppercase tracking-widest font-bold text-slate-600">End of Catalog</span>
+                          <span className="text-xs uppercase tracking-widest font-bold text-slate-600">Каталогийн төгсгөл</span>
                           <p className="text-xs text-slate-400 mt-1">Flip forward to restart</p>
                         </div>
                       )}
@@ -1935,7 +1936,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                     </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                      <span className="text-xs uppercase tracking-widest font-semibold">End of Catalog</span>
+                      <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
                     </div>
                   )}
                 </div>
@@ -2012,7 +2013,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
                       </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400">
-                        <span className="text-xs uppercase tracking-widest font-semibold">End of Catalog</span>
+                        <span className="text-xs uppercase tracking-widest font-semibold">Каталогийн төгсгөл</span>
                       </div>
                     )}
                   </motion.div>
@@ -2197,7 +2198,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             className="absolute bottom-16 inset-x-6 bg-slate-950/95 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 shadow-2xl z-40"
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3 text-xs">
-              <span className="font-bold text-slate-200">Catalog Page Spreads</span>
+              <span className="font-bold text-slate-200">Каталогийн хуудас</span>
               <button
                 type="button"
                 onClick={() => setShowThumbnails(false)}

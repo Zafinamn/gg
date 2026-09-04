@@ -58,11 +58,8 @@ export const UploadZone: React.FC<UploadZoneProps> = ({ onFileSelected, isUpload
       <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 xl:gap-20">
         <div className="relative max-w-2xl">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-            <div className={`mb-5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold ${isDarkMode ? "border-indigo-400/20 bg-indigo-500/[0.08] text-indigo-300" : "border-indigo-200 bg-indigo-50 text-indigo-600"}`}>
-              <Sparkles className="h-3.5 w-3.5" /> Ухаалаг PDF туршлага
-            </div>
             <h1 className={`text-4xl font-extrabold leading-[1.05] tracking-[-0.035em] sm:text-5xl xl:text-6xl ${heading}`}>
-              PDF файлуудаа
+              PDF файлаа
               <br />
               <span className="bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 bg-clip-text text-transparent">интерактив каталогоор</span>
               <br />

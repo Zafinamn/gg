@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Moon, Sparkles, Sun, UploadCloud } from "lucide-react";
+import { BookOpen, Moon, Sun, UploadCloud } from "lucide-react";
 import { UploadedDocument } from "../types";
 import { GGLogo } from "./GGLogo";
 
@@ -35,12 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ currentDocument, onUploadNew, is
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`truncate text-base font-bold tracking-tight sm:text-lg ${isDarkMode ? "text-white" : "text-slate-900"}`}>GG</span>
-              <span className={`hidden h-4 w-px sm:block ${isDarkMode ? "bg-white/15" : "bg-slate-200"}`} />
-              <span className={`hidden truncate text-sm sm:block ${isDarkMode ? "text-slate-300" : "text-slate-500"}`}>PDF каталог үзүүлэгч</span>
-            </div>
-            <div className={`mt-0.5 flex items-center gap-1.5 text-[11px] font-medium ${isDarkMode ? "text-indigo-300" : "text-indigo-600"}`}>
-              <Sparkles className="h-3 w-3" /> Ухаалаг PDF туршлага
+              <span className={`truncate text-base font-bold tracking-tight sm:text-lg ${isDarkMode ? "text-white" : "text-slate-900"}`}>G&G International</span>
             </div>
           </div>
         </div>
