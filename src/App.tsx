@@ -37,7 +37,7 @@ export default function App() {
     } catch (err) {
       console.error("Failed to load PDF into virtual catalog:", err);
       setUploadProgress(0);
-      setErrorMessage("PDF каталогийг уншиж чадсангүй. Өөр файл сонгоно уу.");
+      setErrorMessage("Could not parse this PDF catalog. Please try another file.");
     }
   };
 
