@@ -45,6 +45,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   filename,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const stageViewportRef = useRef<HTMLDivElement>(null);
   const leftCanvasRef = useRef<HTMLCanvasElement>(null);
   const rightCanvasRef = useRef<HTMLCanvasElement>(null);
   const singleCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -257,13 +258,23 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
   useEffect(() => {
     if (!pdfDoc || isLoading) return;
 
-    const containerWidth = containerRef.current?.clientWidth || 900;
-    // Calculate page target dimensions
+    const stageWidth = stageViewportRef.current?.clientWidth || containerRef.current?.clientWidth || 900;
+    const stageHeight = stageViewportRef.current?.clientHeight || 620;
+    // Size from the actual viewing stage, not the outer viewer. This keeps the
+    // page proportions stable when switching between 2-page and 1-page modes.
+    const usableWidth = Math.max(320, stageWidth - 48);
+    const usableHeight = Math.max(320, stageHeight - 72);
+    // PDF pages are rendered from their natural aspect ratio, so cap width by
+    // the available height as well to prevent the single-page view from growing
+    // vertically and appearing cropped after a mode switch.
+    const pageAspect = 0.707; // safe A-series fallback; actual PDF ratio is preserved by PDF.js
+    const maxWidthFromHeight = usableHeight * pageAspect;
+
     if (spreadMode === "double") {
       const isBackCoverView = totalPages >= 4 && totalPages % 2 === 0 && currentPage === totalPages;
       if (currentPage === 1) {
         // Front Cover view: single centered page
-        const coverWidth = Math.min(Math.max(containerWidth * 0.46, 320), 540);
+        const coverWidth = Math.min(Math.max(usableWidth * 0.48, 320), 540, maxWidthFromHeight);
         renderPageToCanvas(1, singleCanvasRef.current, coverWidth);
 
         // Preload inside cover (Page 2) for back of cover leaf
@@ -276,7 +287,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         }
       } else if (isBackCoverView) {
         // Back Cover view (end of catalog): single centered page
-        const coverWidth = Math.min(Math.max(containerWidth * 0.46, 320), 540);
+        const coverWidth = Math.min(Math.max(usableWidth * 0.48, 320), 540, maxWidthFromHeight);
         renderPageToCanvas(totalPages, singleCanvasRef.current, coverWidth);
 
         // Preload inside back cover (Page totalPages - 1)
@@ -289,7 +300,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         }
       } else {
         // Double spread view
-        const spreadPageWidth = Math.min(Math.max((containerWidth - 64) * 0.46, 280), 480);
+        const spreadPageWidth = Math.min(Math.max((usableWidth - 24) * 0.47, 280), 480, maxWidthFromHeight);
         const leftPageNum = currentPage % 2 === 0 ? currentPage : currentPage - 1;
         const rightPageNum = leftPageNum + 1;
 
@@ -317,7 +328,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       }
     } else {
       // Single page view
-      const singleWidth = Math.min(Math.max(containerWidth * 0.65, 340), 680);
+      const singleWidth = Math.min(Math.max(usableWidth * 0.72, 340), 680, maxWidthFromHeight);
       renderPageToCanvas(currentPage, singleCanvasRef.current, singleWidth);
       if (currentPage + 1 <= totalPages) {
         renderPageToCanvas(currentPage + 1, singleNextCanvasRef.current, singleWidth);
@@ -500,6 +511,40 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       setCurrentPage(newPage);
       setIsFlipping(false);
     }, 260);
+  };
+
+  // Switch view mode without carrying an incompatible spread position or
+  // in-progress 3D transform into the new layout. In double mode, page 1 is
+  // the cover and interior spreads start on even pages; in single mode the
+  // selected page remains the selected page.
+  const switchSpreadMode = (mode: SpreadViewMode) => {
+    if (mode === spreadMode) return;
+
+    // Finish/clear any visual leaf transforms before changing the layout.
+    coverRotateY.set(0);
+    leftRotateY.set(0);
+    rightRotateY.set(0);
+    singleRotateY.set(0);
+    setIsPageDragging(false);
+    setDragSide(null);
+    setDragActiveDirection(null);
+    setIsFlipping(false);
+
+    if (mode === "double") {
+      // Preserve the currently viewed single page, but snap interior pages to
+      // a valid left-hand spread. Page 1 stays the front cover.
+      setCurrentPage((page) => {
+        if (page <= 1) return 1;
+        if (page >= totalPages) return totalPages % 2 === 0 ? totalPages : Math.max(2, totalPages - 1);
+        return page % 2 === 0 ? page : Math.max(2, page - 1);
+      });
+    } else {
+      // Keep the exact current page when going from a spread to single-page
+      // view, rather than jumping to the spread's left page.
+      setCurrentPage((page) => Math.min(Math.max(page, 1), totalPages));
+    }
+
+    setSpreadMode(mode);
   };
 
   const handleNext = () => {
@@ -949,7 +994,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
           <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 p-0.5 rounded-xl">
             <button
               type="button"
-              onClick={() => setSpreadMode("double")}
+              onClick={() => switchSpreadMode("double")}
               className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
                 spreadMode === "double"
                   ? "bg-indigo-600 text-white shadow-xs"
@@ -961,7 +1006,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setSpreadMode("single")}
+              onClick={() => switchSpreadMode("single")}
               className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
                 spreadMode === "single"
                   ? "bg-indigo-600 text-white shadow-xs"
@@ -1164,6 +1209,7 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
         id="catalog-stage-viewport"
         onMouseMove={handleMouseMoveLoupe}
         onMouseLeave={handleMouseLeaveLoupe}
+        ref={stageViewportRef}
         className="relative flex-1 overflow-auto flex items-center justify-center p-4 sm:p-10 perspective-[2000px] bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 min-h-[460px] pb-24 select-none touch-none"
       >
         {/* Swipe & Gesture Hint Pill */}
