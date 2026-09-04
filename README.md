@@ -1,14 +1,16 @@
-# G&G PDF Catalog Viewer
+# G&G International PDF Catalog Viewer
 
-React + Vite PDF catalog viewer with Vercel Blob share/export links.
+A React + Vite PDF catalog viewer with smooth page-turning, zoom/loupe, search, bookmarks, sharing, and an admin analytics dashboard.
+
+## Run
+
+```bash
+npm install
+npm run dev
+```
 
 ## Vercel
-1. Connect the Vercel Blob store to this project.
-2. The store should be **Public** because shared catalog PDFs are served directly by their Blob URLs.
-3. Deploy/redeploy this project.
 
-The Share button uploads the current PDF to Vercel Blob using the standard `@vercel/blob/client` flow, then creates a clean `/share/<id>` viewer link.
+Deploy the project root to Vercel. The app uses Vercel Blob for shared catalog storage.
 
-Shared links open directly in the catalog viewer and do not expose the upload-homepage flow.
-
-V23 uses OIDC-authenticated presigned Blob PUT upload; it does not use @vercel/blob/client token exchange.
+Set the required environment variables in Vercel Project Settings → Environment Variables.
