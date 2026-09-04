@@ -46,9 +46,25 @@ export default function App() {
         // for the upload. This avoids depending on a metadata/index lookup.
         if (directBlobUrl) {
           const decodedUrl = directBlobUrl;
-          if (!/^https:\/\/.+\.public\.blob\.vercel-storage\.com\//i.test(decodedUrl)) {
+          let blobUrl: URL;
+          try {
+            blobUrl = new URL(decodedUrl);
+          } catch {
             throw new Error("Каталогийн холбоос буруу байна.");
           }
+
+          // Signed PUT URLs can use a Blob storage hostname that does not
+          // literally contain the `.public.` label even for a public store.
+          // The previous strict hostname regex rejected valid share links
+          // before the browser ever attempted to load the PDF. Only require
+          // HTTPS + Vercel Blob storage here, then use the exact URL returned
+          // by the upload flow.
+          if (blobUrl.protocol !== "https:" || !blobUrl.hostname.endsWith(".blob.vercel-storage.com")) {
+            throw new Error("Каталогийн холбоос буруу байна.");
+          }
+
+          blobUrl.search = "";
+          blobUrl.hash = "";
 
           if (cancelled) return;
           setCurrentDoc({
@@ -57,7 +73,7 @@ export default function App() {
             size: 0,
             base64: "",
             blobUrl: "",
-            pdfUrl: decodedUrl,
+            pdfUrl: blobUrl.toString(),
           });
           setUploadProgress(100);
           return;
