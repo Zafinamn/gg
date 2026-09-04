@@ -1,16 +1,11 @@
-# G&G International PDF Catalog Viewer
+# PDF AI Analyzer & Catalog Viewer
 
-A React + Vite PDF catalog viewer with smooth page-turning, zoom/loupe, search, bookmarks, sharing, and an admin analytics dashboard.
+React + Vite PDF catalog viewer with Vercel Blob sharing and a protected `/admin` analytics dashboard.
 
-## Run
+## Deploy
 
-```bash
-npm install
-npm run dev
-```
+Build command: `npm run build`
 
-## Vercel
+Admin password: configure `ADMIN_PASSWORD` in Vercel Environment Variables.
 
-Deploy the project root to Vercel. The app uses Vercel Blob for shared catalog storage.
-
-Set the required environment variables in Vercel Project Settings → Environment Variables.
+The `/admin` URL is served by the main app and does not require a separate HTML entry.
