@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Globe2, KeyRound, LogOut, MapPin, RefreshCw, Eye, FileText, Link2, Copy, Plus, Check } from 'lucide-react';
+import { BarChart3, Globe2, KeyRound, LogOut, MapPin, RefreshCw, Eye, FileText, Link2, Copy, Plus, Check, Trash2, ExternalLink, HardDrive } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -36,6 +36,8 @@ export const AdminDashboard: React.FC = () => {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [editingLinkName, setEditingLinkName] = useState('');
   const [savingLinkName, setSavingLinkName] = useState(false);
+  const [pdfs, setPdfs] = useState<{ id: string; filename: string; size: number; uploadedAt: string | null; url: string; opens: number; links: number }[]>([]);
+  const [deletingPdfId, setDeletingPdfId] = useState<string | null>(null);
 
   const maxDaily = Math.max(1, ...((data?.daily || []).map((d) => d.opens)));
   const countries = useMemo(() => {
@@ -52,13 +54,26 @@ export const AdminDashboard: React.FC = () => {
       const json = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(json.error || 'Ачаалж чадсангүй.');
       setData(json);
+      await loadPdfs(nextToken);
     } catch (e: any) {
       setError(e?.message || 'Ачаалж чадсангүй.');
       if (/unauthorized/i.test(e?.message || '')) { sessionStorage.removeItem('gg-admin-token'); setToken(null); }
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { if (token) load(token); }, [token]);
+  const loadPdfs = async (nextToken = token) => {
+    if (!nextToken) return;
+    try {
+      const r = await fetch('/api/admin-catalogs', { headers: { Authorization: `Bearer ${nextToken}` }, cache: 'no-store' });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json.error || 'PDF жагсаалт ачаалж чадсангүй.');
+      setPdfs(Array.isArray(json.catalogs) ? json.catalogs : []);
+    } catch (e: any) {
+      setError(e?.message || 'PDF жагсаалт ачаалж чадсангүй.');
+    }
+  };
+
+  useEffect(() => { if (token) { load(token); loadPdfs(token); } }, [token]);
 
   useEffect(() => {
     if (!mapEl) return;
@@ -119,6 +134,25 @@ export const AdminDashboard: React.FC = () => {
     finally { setSavingLinkName(false); }
   };
 
+  const deletePdf = async (pdf: { id: string; filename: string }) => {
+    if (!token) return;
+    const ok = window.confirm(`“${pdf.filename}” PDF-г бүр мөсөн устгах уу?\n\nТүүнтэй холбоотой хуваалцах холбоосууд мөн ажиллахаа болино.`);
+    if (!ok) return;
+    setDeletingPdfId(pdf.id); setError('');
+    try {
+      const r = await fetch(`/api/admin-catalogs?id=${encodeURIComponent(pdf.id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json.error || 'PDF устгаж чадсангүй.');
+      setPdfs((items) => items.filter((item) => item.id !== pdf.id));
+      await load(token);
+    } catch (e: any) {
+      setError(e?.message || 'PDF устгаж чадсангүй.');
+    } finally { setDeletingPdfId(null); }
+  };
+
   const copy = async (value: string) => {
     try { await navigator.clipboard.writeText(value); return true; } catch {
       const el = document.createElement('textarea'); el.value = value; document.body.appendChild(el); el.select(); document.execCommand('copy'); el.remove(); return true;
@@ -144,6 +178,30 @@ export const AdminDashboard: React.FC = () => {
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Stat icon={<Eye />} label="Нийт нээлт" value={data?.summary.totalOpens ?? 0} /><Stat icon={<FileText />} label="Хуваалцсан каталог" value={data?.summary.totalCatalogs ?? 0} /><Stat icon={<Globe2 />} label="Улс" value={data?.summary.countries ?? 0} /><Stat icon={<MapPin />} label="Хамгийн олон хот" value={data?.summary.topCity ?? '—'} /></section>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+          <div className="mb-1 flex items-center gap-2"><HardDrive className="h-5 w-5 text-indigo-300" /><h2 className="font-semibold">Хадгалсан PDF файлууд</h2></div>
+          <p className="mb-4 text-sm text-slate-400">Энд Blob storage-д хадгалагдсан бүх PDF харагдана. Автоматаар устгахгүй — та өөрөө устгах хүртэл хадгалагдана.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500"><tr><th className="pb-3">Файл</th><th className="pb-3">Хэмжээ</th><th className="pb-3">Нээлт</th><th className="pb-3">Холбоос</th><th className="pb-3">Оруулсан</th><th className="pb-3">Үйлдэл</th></tr></thead>
+              <tbody>
+                {pdfs.map((pdf) => <tr key={pdf.id} className="border-t border-white/5">
+                  <td className="py-3"><div className="font-medium">{pdf.filename}</div><div className="text-xs text-slate-500">{pdf.id}</div></td>
+                  <td className="py-3 text-slate-300">{formatBytes(pdf.size)}</td>
+                  <td className="py-3 font-semibold text-indigo-200">{pdf.opens}</td>
+                  <td className="py-3 text-slate-300">{pdf.links}</td>
+                  <td className="py-3 text-slate-400">{pdf.uploadedAt ? new Date(pdf.uploadedAt).toLocaleString('mn-MN') : '—'}</td>
+                  <td className="py-3"><div className="flex flex-wrap gap-2">
+                    <a href={pdf.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs hover:bg-white/5"><ExternalLink className="h-3.5 w-3.5" /> Үзэх</a>
+                    <button onClick={() => deletePdf(pdf)} disabled={deletingPdfId === pdf.id} className="inline-flex items-center gap-1 rounded-lg border border-rose-400/20 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-400/10 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> {deletingPdfId === pdf.id ? 'Устгаж байна...' : 'Устгах'}</button>
+                  </div></td>
+                </tr>)}
+                {!pdfs.length && <tr><td colSpan={6} className="py-8 text-center text-slate-500">Одоогоор хадгалсан PDF алга.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
           <div className="mb-4 flex items-center gap-2"><Link2 className="h-5 w-5 text-indigo-300" /><h2 className="font-semibold">Дэлгүүр тус бүрийн холбоос</h2></div>
           <p className="mb-4 text-sm text-slate-400">Нэг каталогийг олон дэлгүүрт тусдаа холбоосоор тарааж, дэлгүүр бүрийн нээлтийг тусад нь тоолно.</p>
           <form onSubmit={createShareLink} className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto]">
@@ -166,4 +224,12 @@ export const AdminDashboard: React.FC = () => {
 };
 
 const Stat = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) => <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><div className="mb-3 flex items-center gap-2 text-sm text-slate-400">{React.cloneElement(icon as React.ReactElement<any>, { className:'h-4 w-4 text-indigo-300' })}{label}</div><div className="text-2xl font-bold">{value}</div></div>;
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+  const units = ['B','KB','MB','GB'];
+  let i = 0; let n = bytes;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i += 1; }
+  return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
 function escapeHtml(value: string) { return value.replace(/[&<>\"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c] || c)); }
