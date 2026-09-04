@@ -964,50 +964,51 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
     }
   };
 
-  // Spread calculation for labels
-  // Clipboard helper. For an already-open shared page, the click handler is a
-  // direct user gesture, so prefer the synchronous execCommand path first.
-  // Some Chromium/Vercel deployments can resolve navigator.clipboard.writeText()
-  // without actually updating the clipboard when permissions are restricted.
+  // Clipboard helper. Use the modern Clipboard API first so the browser
+  // itself confirms the write. Only fall back to the legacy copy command if
+  // the API is unavailable/rejected. Never report success from a failed path.
   const copyTextToClipboard = async (text: string) => {
-    const legacyCopy = () => {
-      try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.top = "0";
-        textarea.style.left = "-10000px";
-        textarea.style.width = "1px";
-        textarea.style.height = "1px";
-        textarea.style.opacity = "1";
-        textarea.style.pointerEvents = "none";
-        document.body.appendChild(textarea);
-        textarea.focus({ preventScroll: true });
-        textarea.select();
-        textarea.setSelectionRange(0, textarea.value.length);
-        const copied = document.execCommand("copy");
-        textarea.remove();
-        return copied;
-      } catch {
-        return false;
-      }
-    };
-
-    // This is the most reliable one-click path for the shared-view button.
-    if (legacyCopy()) return true;
-
-    if (navigator.clipboard?.writeText) {
+    // Modern secure-context clipboard. This is the authoritative path.
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(text);
         return true;
-      } catch {
-        return false;
+      } catch (error) {
+        console.warn("Clipboard API write failed, trying legacy copy:", error);
       }
     }
 
-    return false;
+    // Legacy fallback for browsers/contexts where Clipboard API is blocked.
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "true");
+      textarea.setAttribute("aria-hidden", "true");
+      textarea.style.position = "fixed";
+      textarea.style.top = "50%";
+      textarea.style.left = "50%";
+      textarea.style.width = "2px";
+      textarea.style.height = "2px";
+      textarea.style.padding = "0";
+      textarea.style.border = "0";
+      textarea.style.outline = "0";
+      textarea.style.opacity = "0";
+      textarea.style.zIndex = "-1";
+      document.body.appendChild(textarea);
+
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const copied = document.execCommand("copy");
+      textarea.remove();
+
+      return copied;
+    } catch (error) {
+      console.warn("Legacy clipboard copy failed:", error);
+      return false;
+    }
   };
+
 
   const showShareCopied = () => {
     setShareError(null);
