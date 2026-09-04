@@ -34,7 +34,6 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "
 import { soundEffects } from "../utils/soundEffects";
 import { SpreadViewMode, CatalogBookmark } from "../types";
 import { GGLogo } from "./GGLogo";
-import { uploadPresigned } from "@vercel/blob/client";
 
 // Configure pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -980,17 +979,42 @@ export const VirtualCatalogViewer: React.FC<VirtualCatalogViewerProps> = ({
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
       const catalogId = crypto.randomUUID();
-      const blob = await uploadPresigned(`catalogs/${catalogId}.pdf`, pdfBlob, {
-        access: "public",
-        handleUploadUrl: "/api/blob-upload",
-        contentType: "application/pdf",
-        multipart: true,
-        onUploadProgress: (event) => {
-          if (event.percentage >= 0) setShareCopied(false);
-        },
+      const tokenResponse = await fetch("/api/blob-upload", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pathname: `catalogs/${catalogId}.pdf`,
+          contentType: "application/pdf",
+        }),
       });
 
-      if (!blob?.url) throw new Error("Каталог хадгалах үед алдаа гарлаа.");
+      let tokenData: any = null;
+      try {
+        tokenData = await tokenResponse.json();
+      } catch {
+        tokenData = null;
+      }
+
+      if (!tokenResponse.ok || !tokenData?.presignedUrl) {
+        throw new Error(
+          tokenData?.error || `Vercel Blob URL үүсгэхэд алдаа гарлаа (${tokenResponse.status}).`,
+        );
+      }
+
+      const uploadResponse = await fetch(tokenData.presignedUrl, {
+        method: "PUT",
+        headers: { "content-type": "application/pdf" },
+        body: pdfBlob,
+      });
+
+      if (!uploadResponse.ok) {
+        let uploadError = "Каталог Blob-д хадгалагдсангүй.";
+        try {
+          const text = await uploadResponse.text();
+          if (text) uploadError = `${uploadError} ${text}`;
+        } catch {}
+        throw new Error(uploadError);
+      }
 
       const shareUrl = new URL(`/share/${catalogId}`, window.location.origin).toString();
       await navigator.clipboard.writeText(shareUrl);

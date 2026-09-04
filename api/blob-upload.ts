@@ -1,36 +1,48 @@
-import { handleUploadPresigned, issueSignedToken } from "@vercel/blob/client";
+import { issueSignedToken, presignUrl } from "@vercel/blob";
 
 export default async function handler(request: Request): Promise<Response> {
   try {
+    if (request.method !== "POST") {
+      return Response.json({ error: "Method not allowed" }, { status: 405 });
+    }
+
     const body = await request.json();
+    const pathname = body?.pathname;
+    const contentType = body?.contentType || "application/pdf";
 
-    const jsonResponse = await handleUploadPresigned({
-      body,
-      request,
-      webhookPublicKey: process.env.BLOB_WEBHOOK_PUBLIC_KEY,
-      getSignedToken: async (pathname, _clientPayload, _multipart) => {
-        if (!/^catalogs\/[a-f0-9-]+\.pdf$/i.test(pathname)) {
-          throw new Error("Invalid catalog path.");
-        }
+    if (typeof pathname !== "string" || !/^catalogs\/[a-f0-9-]{20,64}\.pdf$/i.test(pathname)) {
+      return Response.json({ error: "Invalid catalog path." }, { status: 400 });
+    }
 
-        const token = await issueSignedToken({
-          pathname,
-          operations: ["put"],
-          allowedContentTypes: ["application/pdf"],
-          maximumSizeInBytes: 100 * 1024 * 1024,
-          validUntil: Date.now() + 10 * 60 * 1000,
-        });
+    if (contentType !== "application/pdf") {
+      return Response.json({ error: "Only PDF files are allowed." }, { status: 400 });
+    }
 
-        return { token };
-      },
+    const signedToken = await issueSignedToken({
+      pathname,
+      operations: ["put"],
+      allowedContentTypes: ["application/pdf"],
+      maximumSizeInBytes: 100 * 1024 * 1024,
+      validUntil: Date.now() + 10 * 60 * 1000,
     });
 
-    return Response.json(jsonResponse);
+    const { presignedUrl } = await presignUrl(signedToken, {
+      operation: "put",
+      pathname,
+      access: "public",
+      allowedContentTypes: ["application/pdf"],
+      maximumSizeInBytes: 100 * 1024 * 1024,
+      validUntil: signedToken.validUntil,
+    });
+
+    return Response.json({ presignedUrl });
   } catch (error: any) {
-    console.error("Blob presigned upload error:", error);
+    console.error("Blob presigned URL error:", error);
     return Response.json(
-      { error: error?.message || "Upload token үүсгэж чадсангүй." },
-      { status: 400 },
+      {
+        error: error?.message || "Presigned URL үүсгэж чадсангүй.",
+      },
+      { status: 500 },
     );
   }
 }
